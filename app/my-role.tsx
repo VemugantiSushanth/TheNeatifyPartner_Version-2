@@ -11,7 +11,6 @@ import {
   RefreshControl,
   Alert,
   Pressable,
-  Platform,
   StatusBar,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
@@ -31,6 +30,8 @@ const slides = [
 
 export default function MyRoleScreen() {
   const [newCount, setNewCount] = useState(0);
+  const [assignedCount, setAssignedCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
   const [activeSlide, setActiveSlide] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -38,7 +39,7 @@ export default function MyRoleScreen() {
   const sliderRef = useRef<FlatList>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* 🔙 BACK → LOGIN (ONLY FROM MY ROLE) */
+  /* 🔙 BACK → LOGIN */
   useFocusEffect(
     useCallback(() => {
       const backAction = () => {
@@ -50,35 +51,49 @@ export default function MyRoleScreen() {
     }, []),
   );
 
-  /* 🔔 FETCH NOTIFICATIONS */
-  const fetchCount = async () => {
+  /* 🔔 FETCH COUNTS */
+  const fetchCounts = async () => {
     const { data } = await supabase.auth.getUser();
     const email = data.user?.email;
     if (!email) return;
 
-    const { count } = await supabase
+    const { count: notif } = await supabase
       .from("bookings")
       .select("*", { count: "exact", head: true })
       .eq("assigned_staff_email", email)
       .eq("is_viewed", false);
 
-    setNewCount(count || 0);
+    const { count: assigned } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("assigned_staff_email", email)
+      .neq("work_status", "COMPLETED");
+
+    const { count: completed } = await supabase
+      .from("bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("assigned_staff_email", email)
+      .eq("work_status", "COMPLETED");
+
+    setNewCount(notif || 0);
+    setAssignedCount(assigned || 0);
+    setCompletedCount(completed || 0);
   };
 
   useEffect(() => {
-    fetchCount();
+    fetchCounts();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      fetchCount();
+      fetchCounts();
     }, []),
   );
 
   /* 🔄 REFRESH */
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchCount();
+    await fetchCounts();
     setRefreshing(false);
   }, []);
 
@@ -114,7 +129,7 @@ export default function MyRoleScreen() {
     <SafeAreaView style={{ flex: 1 }}>
       <FlatList
         data={[{ key: "main" }]}
-        contentContainerStyle={{ paddingBottom: 90 }}
+        contentContainerStyle={{ paddingBottom: 200 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -129,11 +144,32 @@ export default function MyRoleScreen() {
                 style={styles.logo}
               />
 
-              <TouchableOpacity onPress={() => setShowMenu(true)}>
-                <Ionicons name="person-circle-outline" size={34} color="#000" />
-              </TouchableOpacity>
+              <View style={styles.headerRight}>
+                {/* 🔔 BELL */}
+                <TouchableOpacity
+                  style={styles.bellIcon}
+                  onPress={() => router.push("/new-services")}
+                >
+                  <Ionicons name="notifications" size={26} color="#000" />
+                  {newCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{newCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* 👤 PROFILE */}
+                <TouchableOpacity onPress={() => setShowMenu(true)}>
+                  <Ionicons
+                    name="person-circle-outline"
+                    size={34}
+                    color="#000"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
+            {/* ===== PROFILE MENU OVERLAY ===== */}
             {showMenu && (
               <Pressable
                 style={styles.overlay}
@@ -141,6 +177,7 @@ export default function MyRoleScreen() {
               />
             )}
 
+            {/* ===== PROFILE MENU ===== */}
             {showMenu && (
               <View style={styles.menu}>
                 <TouchableOpacity
@@ -196,33 +233,35 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
-            {/* 🔔 NEW ASSIGNED */}
-            <TouchableOpacity
-              style={styles.notifyBtn}
-              onPress={() => router.push("/new-services")}
-            >
-              <Text style={styles.notifyText}>New Assigned Services</Text>
+            {/* ================= SUMMARY ================= */}
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryBox, styles.assignedBox]}>
+                <Text style={styles.summaryTitle}>Assigned</Text>
+                <Text style={[styles.summaryCount, { color: "#f97316" }]}>
+                  {assignedCount}
+                </Text>
+              </View>
 
-              {newCount > 0 && (
-                <View style={styles.bellWrapper}>
-                  <Ionicons name="notifications" size={20} color="#000" />
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{newCount}</Text>
-                  </View>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* 📋 MY ASSIGNED */}
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={() => router.push("/assigned-services")}
-            >
-              <Text style={styles.primaryBtnText}>My Assigned Services</Text>
-            </TouchableOpacity>
+              <View style={[styles.summaryBox, styles.completedBox]}>
+                <Text style={styles.summaryTitle}>Completed</Text>
+                <Text style={[styles.summaryCount, { color: "#16a34a" }]}>
+                  {completedCount}
+                </Text>
+              </View>
+            </View>
           </View>
         )}
       />
+
+      {/* ================= MY ASSIGNED SERVICES ================= */}
+      <View style={styles.fixedButtonWrapper}>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={() => router.push("/assigned-services")}
+        >
+          <Text style={styles.primaryBtnText}>My Assigned Services</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* ================= FOOTER ================= */}
       <View style={styles.footer}>
@@ -231,7 +270,10 @@ export default function MyRoleScreen() {
           <Text style={styles.footerTextActive}>Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.footerItem}>
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.push("/dashboard")}
+        >
           <Ionicons name="calendar-outline" size={22} color="#000" />
           <Text style={styles.footerText}>Dashboard</Text>
         </TouchableOpacity>
@@ -256,13 +298,39 @@ const styles = StyleSheet.create({
   header: {
     height: 72,
     paddingHorizontal: 20,
-    backgroundColor: "#FFD700",
+    backgroundColor: "#ffffff",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
-  logo: { width: 160, height: 44, resizeMode: "contain" },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  logo: { width: 190, height: 64, resizeMode: "contain" },
+
+  bellIcon: { position: "relative" },
+
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -10,
+    backgroundColor: "#000",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  badgeText: {
+    color: "#FFD700",
+    fontWeight: "800",
+    fontSize: 12,
+  },
 
   overlay: {
     position: "absolute",
@@ -314,44 +382,36 @@ const styles = StyleSheet.create({
 
   activeDot: { backgroundColor: "#000" },
 
-  notifyBtn: {
-    backgroundColor: "#FFD700",
-    marginHorizontal: 40,
-    marginTop: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
+  summaryRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
+    marginHorizontal: 16,
+    gap: 12,
   },
 
-  notifyText: { fontWeight: "800", fontSize: 15 },
-
-  bellWrapper: { position: "relative" },
-
-  badge: {
-    position: "absolute",
-    top: -6,
-    right: -10,
-    backgroundColor: "#000",
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  summaryBox: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 16,
     alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
   },
 
-  badgeText: {
-    color: "#FFD700",
-    fontWeight: "800",
-    fontSize: 12,
+  assignedBox: { borderColor: "#f97316" },
+  completedBox: { borderColor: "#16a34a" },
+
+  summaryTitle: { fontWeight: "700", marginBottom: 6 },
+
+  summaryCount: { fontSize: 22, fontWeight: "800" },
+
+  fixedButtonWrapper: {
+    paddingHorizontal: 40,
+    paddingBottom: 10,
+    backgroundColor: "#fff",
   },
 
   primaryBtn: {
     backgroundColor: "#FFD700",
-    marginHorizontal: 40,
-    marginTop: 14,
     paddingVertical: 12,
     borderRadius: 16,
     alignItems: "center",
@@ -361,7 +421,7 @@ const styles = StyleSheet.create({
 
   footer: {
     height: 70,
-    backgroundColor: "#FFD700",
+    backgroundColor: "#ffffff",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",

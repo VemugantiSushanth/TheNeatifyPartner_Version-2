@@ -11,10 +11,13 @@ import {
   ScrollView,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { supabase } from "./supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+/* ================= SCREEN ================= */
 
 export default function MyAccountScreen() {
   const [fullName, setFullName] = useState("");
@@ -22,8 +25,8 @@ export default function MyAccountScreen() {
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   /* ================= LOAD PROFILE ================= */
   useEffect(() => {
@@ -43,7 +46,11 @@ export default function MyAccountScreen() {
       if (profile) {
         setFullName(profile.full_name ?? "");
         setPhone(profile.phone ?? "");
-        setAvatarUrl(profile.avatar_url ?? null);
+
+        // ✅ CACHE-BUST WHEN LOADING
+        setAvatarUrl(
+          profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : null,
+        );
       }
     };
 
@@ -56,7 +63,7 @@ export default function MyAccountScreen() {
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission Required", "Allow access to photos");
+      Alert.alert("Permission Required", "Allow photo access");
       return;
     }
 
@@ -68,36 +75,59 @@ export default function MyAccountScreen() {
     });
 
     if (result.canceled) return;
-    uploadImage(result.assets[0].uri);
+
+    replaceProfileImage(result.assets[0].uri);
   };
 
-  /* ================= UPLOAD IMAGE ================= */
-  const uploadImage = async (uri: string) => {
+  /* ================= DELETE + UPLOAD + REFRESH ================= */
+  const replaceProfileImage = async (uri: string) => {
     if (!userId) return;
 
     try {
-      const blob = await (await fetch(uri)).blob();
       const filePath = `${userId}.jpg`;
 
-      await supabase.storage.from("avatars").upload(filePath, blob, {
-        upsert: true,
-        contentType: "image/jpeg",
+      // 1️⃣ DELETE OLD IMAGE (ignore errors if not exists)
+      await supabase.storage.from("avatars").remove([filePath]);
+
+      // 2️⃣ READ NEW IMAGE
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64",
       });
 
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+
+      // 3️⃣ UPLOAD NEW IMAGE
+      const { error } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, bytes, {
+          contentType: "image/jpeg",
+        });
+
+      if (error) throw error;
+
+      // 4️⃣ GET PUBLIC URL
       const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
+      // 5️⃣ UPDATE DB (CLEAN URL)
       await supabase
         .from("staff_profile")
         .update({ avatar_url: data.publicUrl })
         .eq("id", userId);
 
-      setAvatarUrl(data.publicUrl);
+      // 6️⃣ FORCE UI REFRESH
+      setAvatarUrl(`${data.publicUrl}?t=${Date.now()}`);
+
+      Alert.alert("Success", "Profile photo updated");
     } catch (err: any) {
-      Alert.alert("Upload Failed", err.message);
+      Alert.alert("Error", err.message);
     }
   };
 
-  /* ================= SAVE ================= */
+  /* ================= SAVE PROFILE ================= */
   const saveProfile = async () => {
     if (!userId) return;
 
@@ -113,9 +143,8 @@ export default function MyAccountScreen() {
 
     setSaving(false);
 
-    if (error) {
-      Alert.alert("Error", error.message);
-    } else {
+    if (error) Alert.alert("Error", error.message);
+    else {
       Alert.alert("Success", "Profile updated");
       setEditMode(false);
     }
@@ -139,8 +168,8 @@ export default function MyAccountScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
       <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* ================= HEADER CARD ================= */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* ================= HEADER ================= */}
         <View style={styles.headerCard}>
           <View>
             <Text style={styles.headerTitle}>My Profile</Text>
@@ -157,12 +186,22 @@ export default function MyAccountScreen() {
         </View>
 
         {/* ================= AVATAR ================= */}
-        <TouchableOpacity style={styles.avatarWrap} onPress={pickImage}>
+        <TouchableOpacity
+          style={styles.avatarWrap}
+          onPress={pickImage}
+          activeOpacity={editMode ? 0.7 : 1}
+        >
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={40} color="#777" />
+              <Ionicons name="person" size={42} color="#777" />
+            </View>
+          )}
+
+          {editMode && (
+            <View style={styles.cameraIcon}>
+              <Ionicons name="camera" size={16} color="#fff" />
             </View>
           )}
         </TouchableOpacity>
@@ -171,8 +210,8 @@ export default function MyAccountScreen() {
         <ProfileField
           label="FULL NAME"
           value={fullName}
-          onChange={setFullName}
           editable={editMode}
+          onChange={setFullName}
         />
 
         <ProfileField
@@ -185,8 +224,8 @@ export default function MyAccountScreen() {
         <ProfileField
           label="PHONE NUMBER"
           value={phone}
-          onChange={setPhone}
           editable={editMode}
+          onChange={setPhone}
         />
 
         {/* ================= SAVE ================= */}
@@ -205,24 +244,40 @@ export default function MyAccountScreen() {
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ================= FOOTER ================= */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.replace("/my-role")}
+        >
+          <Ionicons name="home" size={22} color="#000" />
+          <Text style={styles.footerText}>Home</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.push("/dashboard")}
+        >
+          <Ionicons name="calendar-outline" size={22} color="#000" />
+          <Text style={styles.footerText}>Dashboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.push("/my-account")}
+        >
+          <Ionicons name="person-outline" size={22} color="#000" />
+          <Text style={styles.footerText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
-/* ================= FIELD COMPONENT ================= */
-function ProfileField({
-  label,
-  value,
-  onChange,
-  editable,
-  helper,
-}: {
-  label: string;
-  value: string;
-  onChange?: (v: string) => void;
-  editable: boolean;
-  helper?: string;
-}) {
+/* ================= FIELD ================= */
+
+function ProfileField({ label, value, editable, onChange, helper }: any) {
   return (
     <View style={styles.fieldCard}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -230,7 +285,7 @@ function ProfileField({
         value={value}
         editable={editable}
         onChangeText={onChange}
-        style={[styles.fieldValue, !editable && { color: "#475569" }]}
+        style={styles.fieldValue}
       />
       {helper && <Text style={styles.helperText}>{helper}</Text>}
     </View>
@@ -247,7 +302,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
   },
 
   headerTitle: { fontSize: 22, fontWeight: "800" },
@@ -256,8 +310,7 @@ const styles = StyleSheet.create({
   editBtn: {
     flexDirection: "row",
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    padding: 12,
     borderRadius: 20,
     backgroundColor: "#EFF6FF",
     alignItems: "center",
@@ -271,7 +324,7 @@ const styles = StyleSheet.create({
   },
 
   avatar: {
-    width: 120123,
+    width: 120,
     height: 120,
     borderRadius: 60,
   },
@@ -281,6 +334,18 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: "#E5E7EB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  cameraIcon: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    backgroundColor: "#000",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -297,13 +362,12 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontWeight: "700",
     fontSize: 12,
-    marginBottom: 6,
   },
 
   fieldValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0F172A",
+    marginTop: 6,
   },
 
   helperText: {
@@ -333,4 +397,24 @@ const styles = StyleSheet.create({
   },
 
   logoutText: { color: "#fff", fontWeight: "800" },
+
+  footer: {
+    height: 70,
+    backgroundColor: "#ffffff",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+  },
+
+  footerItem: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  footerText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "600",
+    color: "#000",
+  },
 });

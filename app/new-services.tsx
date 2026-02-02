@@ -166,7 +166,10 @@ export default function NewServices() {
           <Text style={styles.footerText}>Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.footerItem}>
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.push("/dashboard")}
+        >
           <Ionicons name="calendar-outline" size={22} color="#000" />
           <Text style={styles.footerText}>Dashboard</Text>
         </TouchableOpacity>
@@ -188,7 +191,7 @@ export default function NewServices() {
 const styles = StyleSheet.create({
   header: {
     height: 70,
-    backgroundColor: "#FFD700",
+    backgroundColor: "#ffffff",
     paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -196,8 +199,8 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: 160,
-    height: 44,
+    width: 190,
+    height: 64,
     resizeMode: "contain",
   },
 
@@ -253,7 +256,7 @@ const styles = StyleSheet.create({
 
   footer: {
     height: 70,
-    backgroundColor: "#FFD700",
+    backgroundColor: "#ffffff",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
