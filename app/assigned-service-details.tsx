@@ -79,19 +79,17 @@ export default function AssignedServiceDetails() {
     return r.canceled ? null : r.assets[0].uri;
   };
 
-  /* ================= IMAGE UPLOAD (RN SAFE) ================= */
+  /* ================= IMAGE UPLOAD ================= */
   const uploadImage = async (localUri: string, type: "start" | "end") => {
     try {
       const { data } = await supabase.auth.getUser();
       const email = data.user?.email;
       if (!email) return;
 
-      // Expo-safe base64 read
       const base64 = await FileSystem.readAsStringAsync(localUri, {
         encoding: "base64",
       });
 
-      // Convert base64 → Uint8Array
       const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
       const filePath = `staff_uploads/${email}/${booking.id}/${type}_${Date.now()}.jpg`;
@@ -107,7 +105,6 @@ export default function AssignedServiceDetails() {
         return;
       }
 
-      // UI preview (unchanged behavior)
       if (type === "start") {
         setBeforeImages((prev) => [...prev, localUri]);
       } else {
@@ -118,7 +115,6 @@ export default function AssignedServiceDetails() {
     }
   };
 
-  /* ================= IMAGE REMOVE ================= */
   const removeImage = (index: number, type: "start" | "end") => {
     if (type === "start") {
       setBeforeImages((prev) => prev.filter((_, i) => i !== index));
@@ -127,7 +123,6 @@ export default function AssignedServiceDetails() {
     }
   };
 
-  /* ================= OTP ================= */
   const verifyStartOtp = () => {
     if (startOtp !== booking.startotp) {
       Alert.alert("Invalid Start OTP");
@@ -171,6 +166,7 @@ export default function AssignedServiceDetails() {
             <Text>Navigate</Text>
           </TouchableOpacity>
 
+          {/* ================= START OTP ================= */}
           <Text style={styles.label}>Start OTP</Text>
           <TextInput
             style={styles.otpInput}
@@ -257,33 +253,8 @@ export default function AssignedServiceDetails() {
             </Text>
           )}
 
+          {/* ================= END IMAGES FIRST (PLACEMENT FIX) ================= */}
           {workStopped && (
-            <>
-              <Text style={styles.label}>End OTP</Text>
-              <TextInput
-                style={styles.otpInput}
-                value={endOtp}
-                onChangeText={setEndOtp}
-                keyboardType="number-pad"
-                maxLength={6}
-              />
-
-              {endVerified && (
-                <View style={styles.verifiedRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="green" />
-                  <Text style={styles.verifiedText}>Verified</Text>
-                </View>
-              )}
-
-              {!endVerified && (
-                <TouchableOpacity style={styles.btn} onPress={verifyEndOtp}>
-                  <Text style={styles.btnText}>Verify End OTP</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-
-          {endVerified && (
             <>
               <View style={styles.imageRow}>
                 {afterImages.map((uri, i) => (
@@ -313,6 +284,29 @@ export default function AssignedServiceDetails() {
                 </Text>
                 <Ionicons name="camera" size={18} />
               </TouchableOpacity>
+
+              {/* ================= END OTP BELOW ================= */}
+              <Text style={styles.label}>End OTP</Text>
+              <TextInput
+                style={styles.otpInput}
+                value={endOtp}
+                onChangeText={setEndOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+
+              {endVerified && (
+                <View style={styles.verifiedRow}>
+                  <Ionicons name="checkmark-circle" size={16} color="green" />
+                  <Text style={styles.verifiedText}>Verified</Text>
+                </View>
+              )}
+
+              {!endVerified && (
+                <TouchableOpacity style={styles.btn} onPress={verifyEndOtp}>
+                  <Text style={styles.btnText}>Verify End OTP</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
 
