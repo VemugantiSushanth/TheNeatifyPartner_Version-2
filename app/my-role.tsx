@@ -12,6 +12,7 @@ import {
   Alert,
   Pressable,
   StatusBar,
+  Linking,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { supabase } from "./supabase";
@@ -39,7 +40,6 @@ export default function MyRoleScreen() {
   const sliderRef = useRef<FlatList>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* 🔙 BACK → LOGIN */
   useFocusEffect(
     useCallback(() => {
       const backAction = () => {
@@ -51,7 +51,6 @@ export default function MyRoleScreen() {
     }, []),
   );
 
-  /* 🔔 FETCH COUNTS */
   const fetchCounts = async () => {
     const { data } = await supabase.auth.getUser();
     const email = data.user?.email;
@@ -90,14 +89,12 @@ export default function MyRoleScreen() {
     }, []),
   );
 
-  /* 🔄 REFRESH */
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchCounts();
     setRefreshing(false);
   }, []);
 
-  /* 🔁 AUTO SLIDER */
   useEffect(() => {
     autoScrollRef.current = setInterval(() => {
       const next = (activeSlide + 1) % slides.length;
@@ -110,7 +107,6 @@ export default function MyRoleScreen() {
     };
   }, [activeSlide]);
 
-  /* 🚪 LOGOUT */
   const handleLogout = () => {
     Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
@@ -121,6 +117,17 @@ export default function MyRoleScreen() {
           await supabase.auth.signOut();
           router.replace("/login");
         },
+      },
+    ]);
+  };
+
+  /* 📞 CUSTOMER CARE */
+  const handleCustomerCare = () => {
+    Alert.alert("Customer Care", "+91 7617618567", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Call",
+        onPress: () => Linking.openURL("tel:+917617618567"),
       },
     ]);
   };
@@ -137,7 +144,7 @@ export default function MyRoleScreen() {
           <View style={styles.container}>
             <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
 
-            {/* ================= HEADER ================= */}
+            {/* HEADER */}
             <View style={styles.header}>
               <Image
                 source={require("../assets/images/logo.png")}
@@ -145,7 +152,6 @@ export default function MyRoleScreen() {
               />
 
               <View style={styles.headerRight}>
-                {/* 🔔 BELL */}
                 <TouchableOpacity
                   style={styles.bellIcon}
                   onPress={() => router.push("/new-services")}
@@ -158,7 +164,6 @@ export default function MyRoleScreen() {
                   )}
                 </TouchableOpacity>
 
-                {/* 👤 PROFILE */}
                 <TouchableOpacity onPress={() => setShowMenu(true)}>
                   <Ionicons
                     name="person-circle-outline"
@@ -169,7 +174,6 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
-            {/* ===== PROFILE MENU OVERLAY ===== */}
             {showMenu && (
               <Pressable
                 style={styles.overlay}
@@ -177,7 +181,6 @@ export default function MyRoleScreen() {
               />
             )}
 
-            {/* ===== PROFILE MENU ===== */}
             {showMenu && (
               <View style={styles.menu}>
                 <TouchableOpacity
@@ -204,7 +207,7 @@ export default function MyRoleScreen() {
               </View>
             )}
 
-            {/* ================= SLIDER ================= */}
+            {/* SLIDER */}
             <View style={styles.sliderWrapper}>
               <FlatList
                 ref={sliderRef}
@@ -233,7 +236,7 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
-            {/* ================= SUMMARY ================= */}
+            {/* SUMMARY */}
             <View style={styles.summaryRow}>
               <View style={[styles.summaryBox, styles.assignedBox]}>
                 <Text style={styles.summaryTitle}>Assigned</Text>
@@ -253,7 +256,19 @@ export default function MyRoleScreen() {
         )}
       />
 
-      {/* ================= MY ASSIGNED SERVICES ================= */}
+      {/* 🔔 CUSTOMER CARE BUTTON (UPDATED ONLY) */}
+      <View style={styles.customerCareWrapper}>
+        <TouchableOpacity
+          style={styles.customerCareBtn}
+          onPress={handleCustomerCare}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="headset-outline" size={18} color="#000" />
+          <Text style={styles.customerCareText}>Customer Care</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* MY ASSIGNED SERVICES */}
       <View style={styles.fixedButtonWrapper}>
         <TouchableOpacity
           style={styles.primaryBtn}
@@ -263,7 +278,7 @@ export default function MyRoleScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ================= FOOTER ================= */}
+      {/* FOOTER */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.footerItem}>
           <Ionicons name="home" size={22} color="#000" />
@@ -403,6 +418,30 @@ const styles = StyleSheet.create({
   summaryTitle: { fontWeight: "700", marginBottom: 6 },
 
   summaryCount: { fontSize: 22, fontWeight: "800" },
+
+  /* ✅ UPDATED CUSTOMER CARE */
+  customerCareWrapper: {
+    alignItems: "flex-end",
+    paddingHorizontal: 40,
+    marginBottom: 12, // moved up
+  },
+
+  customerCareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#000",
+    backgroundColor: "#fff",
+  },
+
+  customerCareText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
 
   fixedButtonWrapper: {
     paddingHorizontal: 40,

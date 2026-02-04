@@ -11,7 +11,7 @@ import {
   Linking,
   StatusBar,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router"; // ✅ ADD useFocusEffect
+import { router, useFocusEffect } from "expo-router";
 import { supabase } from "./supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,7 +29,7 @@ export default function AssignedServices() {
       .from("bookings")
       .select("*")
       .eq("assigned_staff_email", email)
-      .neq("work_status", "COMPLETED"); // ✅ SOURCE OF TRUTH
+      .neq("work_status", "COMPLETED");
 
     setServices(bookings || []);
   };
@@ -39,7 +39,7 @@ export default function AssignedServices() {
     loadServices();
   }, []);
 
-  /* 🔥 CRITICAL FIX: RELOAD ON FOCUS */
+  /* RELOAD ON FOCUS */
   useFocusEffect(
     useCallback(() => {
       loadServices();
@@ -92,7 +92,6 @@ export default function AssignedServices() {
       >
         {services.map((item) => (
           <View key={item.id} style={styles.card}>
-            {/* CARD CLICK → DETAILS (UNCHANGED) */}
             <TouchableOpacity
               onPress={() =>
                 router.push({
@@ -102,6 +101,13 @@ export default function AssignedServices() {
               }
             >
               <Text style={styles.cardTitle}>{item.customer_name}</Text>
+
+              {/* ✅ NEW: PHONE NUMBER (ONLY ADDITION) */}
+              <Text>
+                <Text style={styles.label}>Phone:</Text>{" "}
+                {item.phone_number || "N/A"}
+              </Text>
+              {/* 🔁 If column name differs, change `phone_number` here */}
 
               <Text>
                 <Text style={styles.label}>Time:</Text> {item.booking_time}
@@ -125,7 +131,6 @@ export default function AssignedServices() {
               </View>
             </TouchableOpacity>
 
-            {/* NAVIGATE BUTTON (UNCHANGED) */}
             <TouchableOpacity
               style={styles.mapBtn}
               onPress={() => openMaps(item.full_address)}

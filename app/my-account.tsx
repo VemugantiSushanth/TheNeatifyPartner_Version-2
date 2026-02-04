@@ -4,14 +4,11 @@ import {
   Image,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
   StatusBar,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { supabase } from "./supabase";
@@ -24,9 +21,7 @@ export default function MyAccountScreen() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [gender, setGender] = useState<string | null>(null);
 
   /* ================= LOAD PROFILE ================= */
   useEffect(() => {
@@ -34,7 +29,6 @@ export default function MyAccountScreen() {
       const { data } = await supabase.auth.getUser();
       if (!data.user) return;
 
-      setUserId(data.user.id);
       setEmail(data.user.email ?? "");
 
       const { data: profile } = await supabase
@@ -46,8 +40,7 @@ export default function MyAccountScreen() {
       if (profile) {
         setFullName(profile.full_name ?? "");
         setPhone(profile.phone ?? "");
-
-        // ✅ CACHE-BUST WHEN LOADING
+        setGender(profile.gender ?? null);
         setAvatarUrl(
           profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : null,
         );
@@ -56,99 +49,6 @@ export default function MyAccountScreen() {
 
     loadProfile();
   }, []);
-
-  /* ================= IMAGE PICK ================= */
-  const pickImage = async () => {
-    if (!editMode || !userId) return;
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Permission Required", "Allow photo access");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-
-    if (result.canceled) return;
-
-    replaceProfileImage(result.assets[0].uri);
-  };
-
-  /* ================= DELETE + UPLOAD + REFRESH ================= */
-  const replaceProfileImage = async (uri: string) => {
-    if (!userId) return;
-
-    try {
-      const filePath = `${userId}.jpg`;
-
-      // 1️⃣ DELETE OLD IMAGE (ignore errors if not exists)
-      await supabase.storage.from("avatars").remove([filePath]);
-
-      // 2️⃣ READ NEW IMAGE
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: "base64",
-      });
-
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-
-      // 3️⃣ UPLOAD NEW IMAGE
-      const { error } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, bytes, {
-          contentType: "image/jpeg",
-        });
-
-      if (error) throw error;
-
-      // 4️⃣ GET PUBLIC URL
-      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
-      // 5️⃣ UPDATE DB (CLEAN URL)
-      await supabase
-        .from("staff_profile")
-        .update({ avatar_url: data.publicUrl })
-        .eq("id", userId);
-
-      // 6️⃣ FORCE UI REFRESH
-      setAvatarUrl(`${data.publicUrl}?t=${Date.now()}`);
-
-      Alert.alert("Success", "Profile photo updated");
-    } catch (err: any) {
-      Alert.alert("Error", err.message);
-    }
-  };
-
-  /* ================= SAVE PROFILE ================= */
-  const saveProfile = async () => {
-    if (!userId) return;
-
-    setSaving(true);
-
-    const { error } = await supabase
-      .from("staff_profile")
-      .update({
-        full_name: fullName,
-        phone,
-      })
-      .eq("id", userId);
-
-    setSaving(false);
-
-    if (error) Alert.alert("Error", error.message);
-    else {
-      Alert.alert("Success", "Profile updated");
-      setEditMode(false);
-    }
-  };
 
   /* ================= LOGOUT ================= */
   const handleLogout = async () => {
@@ -164,6 +64,17 @@ export default function MyAccountScreen() {
     ]);
   };
 
+  /* ================= DEFAULT AVATAR ICON ================= */
+  const renderDefaultAvatar = () => {
+    if (gender === "male") {
+      return <Ionicons name="man" size={48} color="#777" />;
+    }
+    if (gender === "female") {
+      return <Ionicons name="woman" size={48} color="#777" />;
+    }
+    return <Ionicons name="person" size={48} color="#777" />;
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
       <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
@@ -173,71 +84,29 @@ export default function MyAccountScreen() {
         <View style={styles.headerCard}>
           <View>
             <Text style={styles.headerTitle}>My Profile</Text>
-            <Text style={styles.headerSub}>Manage your personal details</Text>
+            <Text style={styles.headerSub}>Personal details (read only)</Text>
           </View>
-
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => setEditMode(true)}
-          >
-            <Ionicons name="pencil" size={18} color="#2563EB" />
-            <Text style={styles.editText}>Edit</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ================= AVATAR ================= */}
-        <TouchableOpacity
-          style={styles.avatarWrap}
-          onPress={pickImage}
-          activeOpacity={editMode ? 0.7 : 1}
-        >
+        <View style={styles.avatarWrap}>
           {avatarUrl ? (
             <Image source={{ uri: avatarUrl }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={42} color="#777" />
+              {renderDefaultAvatar()}
             </View>
           )}
+        </View>
 
-          {editMode && (
-            <View style={styles.cameraIcon}>
-              <Ionicons name="camera" size={16} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* ================= FIELDS ================= */}
-        <ProfileField
-          label="FULL NAME"
-          value={fullName}
-          editable={editMode}
-          onChange={setFullName}
-        />
-
+        {/* ================= READ ONLY FIELDS ================= */}
+        <ProfileField label="FULL NAME" value={fullName} />
         <ProfileField
           label="EMAIL"
           value={email}
-          editable={false}
           helper="Email cannot be changed"
         />
-
-        <ProfileField
-          label="PHONE NUMBER"
-          value={phone}
-          editable={editMode}
-          onChange={setPhone}
-        />
-
-        {/* ================= SAVE ================= */}
-        <TouchableOpacity
-          style={[styles.saveBtn, { opacity: editMode ? 1 : 0.4 }]}
-          disabled={!editMode}
-          onPress={saveProfile}
-        >
-          <Text style={styles.saveText}>
-            {saving ? "Saving..." : "Save Changes"}
-          </Text>
-        </TouchableOpacity>
+        <ProfileField label="PHONE NUMBER" value={phone} />
 
         {/* ================= LOGOUT ================= */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -277,16 +146,11 @@ export default function MyAccountScreen() {
 
 /* ================= FIELD ================= */
 
-function ProfileField({ label, value, editable, onChange, helper }: any) {
+function ProfileField({ label, value, helper }: any) {
   return (
     <View style={styles.fieldCard}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        editable={editable}
-        onChangeText={onChange}
-        style={styles.fieldValue}
-      />
+      <Text style={styles.fieldValue}>{value || "-"}</Text>
       {helper && <Text style={styles.helperText}>{helper}</Text>}
     </View>
   );
@@ -300,23 +164,10 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 20,
     backgroundColor: "#fff",
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
 
   headerTitle: { fontSize: 22, fontWeight: "800" },
   headerSub: { color: "#64748B", marginTop: 4 },
-
-  editBtn: {
-    flexDirection: "row",
-    gap: 6,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-  },
-
-  editText: { color: "#2563EB", fontWeight: "700" },
 
   avatarWrap: {
     alignSelf: "center",
@@ -334,18 +185,6 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: "#E5E7EB",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  cameraIcon: {
-    position: "absolute",
-    bottom: 6,
-    right: 6,
-    backgroundColor: "#000",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -376,27 +215,20 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
   },
 
-  saveBtn: {
-    backgroundColor: "#FFD700",
-    marginHorizontal: 20,
-    marginTop: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-
-  saveText: { fontWeight: "800", fontSize: 16 },
-
   logoutBtn: {
     marginHorizontal: 20,
-    marginTop: 14,
-    backgroundColor: "#0F172A",
-    paddingVertical: 14,
-    borderRadius: 16,
+    marginTop: 24,
+    backgroundColor: "#FFD700",
+    paddingVertical: 16,
+    borderRadius: 20,
     alignItems: "center",
   },
 
-  logoutText: { color: "#fff", fontWeight: "800" },
+  logoutText: {
+    color: "#000",
+    fontWeight: "800",
+    fontSize: 16,
+  },
 
   footer: {
     height: 70,

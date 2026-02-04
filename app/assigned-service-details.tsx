@@ -160,13 +160,26 @@ export default function AssignedServiceDetails() {
           <Text>Address: {booking.full_address}</Text>
 
           <TouchableOpacity
+            style={styles.callBtn}
+            onPress={() => {
+              if (!booking.phone_number) {
+                Alert.alert("Phone number not available");
+                return;
+              }
+              Linking.openURL(`tel:${booking.phone_number}`);
+            }}
+          >
+            <Ionicons name="call" size={18} color="#ffffff" />
+            <Text style={styles.callText}>Call Customer</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.mapBtn}
             onPress={() => openMaps(booking.full_address)}
           >
             <Text>Navigate</Text>
           </TouchableOpacity>
 
-          {/* ================= START OTP ================= */}
           <Text style={styles.label}>Start OTP</Text>
           <TextInput
             style={styles.otpInput}
@@ -225,7 +238,19 @@ export default function AssignedServiceDetails() {
           {beforeImages.length > 0 && !running && !workStopped && (
             <TouchableOpacity
               style={styles.startBtn}
-              onPress={() => setRunning(true)}
+              onPress={() => {
+                Alert.alert(
+                  "You Are Ready To Go 🚀",
+                  "Click OK to start work",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "OK",
+                      onPress: () => setRunning(true),
+                    },
+                  ],
+                );
+              }}
             >
               <Text style={styles.btnText}>Start Work</Text>
             </TouchableOpacity>
@@ -253,7 +278,6 @@ export default function AssignedServiceDetails() {
             </Text>
           )}
 
-          {/* ================= END IMAGES FIRST (PLACEMENT FIX) ================= */}
           {workStopped && (
             <>
               <View style={styles.imageRow}>
@@ -285,7 +309,6 @@ export default function AssignedServiceDetails() {
                 <Ionicons name="camera" size={18} />
               </TouchableOpacity>
 
-              {/* ================= END OTP BELOW ================= */}
               <Text style={styles.label}>End OTP</Text>
               <TextInput
                 style={styles.otpInput}
@@ -359,12 +382,12 @@ const styles = StyleSheet.create({
   verifiedText: { color: "green", fontWeight: "700" },
   btn: {
     marginTop: 10,
-    backgroundColor: "#000",
+    backgroundColor: "#FFD700",
     padding: 10,
     borderRadius: 10,
     alignItems: "center",
   },
-  btnText: { color: "#fff", fontWeight: "700" },
+  btnText: { color: "#000000", fontWeight: "700" },
   imageRow: { flexDirection: "row", gap: 10, marginTop: 10 },
   preview: { width: 60, height: 60, borderRadius: 8 },
   uploadBtn: {
@@ -378,7 +401,7 @@ const styles = StyleSheet.create({
   },
   startBtn: {
     marginTop: 14,
-    backgroundColor: "#2563eb",
+    backgroundColor: "#FFD700",
     padding: 12,
     borderRadius: 12,
     alignItems: "center",
@@ -397,6 +420,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 10,
     alignItems: "center",
+  },
+  callBtn: {
+    marginTop: 10,
+    backgroundColor: "#000000",
+    padding: 10,
+    borderRadius: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 6,
+  },
+  callText: {
+    fontWeight: "700",
+    color: "#ffffff",
   },
   serviceDone: {
     marginTop: 24,
