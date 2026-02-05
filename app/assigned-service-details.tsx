@@ -41,9 +41,30 @@ export default function AssignedServiceDetails() {
 
   const [uploading, setUploading] = useState(false);
 
+  /* ✅ ADDED */
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
   const timerRef = useRef<number | null>(null);
 
+  /* ✅ ADDED */
+  const scrollRef = useRef<ScrollView>(null);
+
   if (!booking) return null;
+
+  /* ================= KEYBOARD LISTENER (ADDED) ================= */
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () =>
+      setIsKeyboardVisible(true),
+    );
+    const hideSub = Keyboard.addListener("keyboardDidHide", () =>
+      setIsKeyboardVisible(false),
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   /* ================= TIMER ================= */
   useEffect(() => {
@@ -199,6 +220,7 @@ export default function AssignedServiceDetails() {
         keyboardVerticalOffset={Platform.OS === "android" ? 60 : 0}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.body,
             { paddingBottom: 80, minHeight: "100%" },
@@ -378,6 +400,12 @@ export default function AssignedServiceDetails() {
                       onChangeText={setEndOtp}
                       keyboardType="number-pad"
                       maxLength={6}
+                      /* ✅ ADDED */
+                      onFocus={() => {
+                        setTimeout(() => {
+                          scrollRef.current?.scrollToEnd({ animated: true });
+                        }, 300);
+                      }}
                     />
 
                     {endVerified && (
@@ -432,28 +460,31 @@ export default function AssignedServiceDetails() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.footerItem}>
-          <Ionicons name="home" size={22} color="#000" />
-          <Text style={styles.footerTextActive}>Home</Text>
-        </TouchableOpacity>
+      {/* ✅ FOOTER LOCKED */}
+      {!isKeyboardVisible && (
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.footerItem}>
+            <Ionicons name="home" size={22} color="#000" />
+            <Text style={styles.footerTextActive}>Home</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.footerItem}
-          onPress={() => router.push("/dashboard")}
-        >
-          <Ionicons name="calendar-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Dashboard</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.footerItem}
+            onPress={() => router.push("/dashboard")}
+          >
+            <Ionicons name="calendar-outline" size={22} color="#000" />
+            <Text style={styles.footerText}>Dashboard</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.footerItem}
-          onPress={() => router.push("/my-account")}
-        >
-          <Ionicons name="person-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.footerItem}
+            onPress={() => router.push("/my-account")}
+          >
+            <Ionicons name="person-outline" size={22} color="#000" />
+            <Text style={styles.footerText}>Profile</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

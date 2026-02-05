@@ -65,6 +65,7 @@ export default function LoginScreen() {
           <Mail size={20} />
           <TextInput
             placeholder="Email Address"
+            placeholderTextColor="#9ca3af"
             style={styles.input}
             autoCapitalize="none"
             value={email}
@@ -76,6 +77,7 @@ export default function LoginScreen() {
           <Lock size={20} />
           <TextInput
             placeholder="Password"
+            placeholderTextColor="#9ca3af"
             style={styles.input}
             secureTextEntry={!showPassword}
             value={password}
@@ -120,8 +122,8 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logo: {
-    width: 300, // ⬆️ increased
-    height: 100, // ⬆️ increased
+    width: 300,
+    height: 100,
     resizeMode: "contain",
     marginBottom: 10,
   },
@@ -142,6 +144,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
+    color: "#000000",
   },
   primaryBtn: {
     backgroundColor: "#FFD700",

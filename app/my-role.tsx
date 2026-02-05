@@ -22,13 +22,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const { height, width } = Dimensions.get("window");
 const SLIDER_HEIGHT = height * 0.42;
 
-const slides = [
-  require("../assets/slides/slide1.png"),
-  require("../assets/slides/slide2.png"),
-  require("../assets/slides/slide3.png"),
-  require("../assets/slides/slide4.png"),
-];
-
 export default function MyRoleScreen() {
   const [newCount, setNewCount] = useState(0);
   const [assignedCount, setAssignedCount] = useState(0);
@@ -37,9 +30,13 @@ export default function MyRoleScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
+  // ✅ NEW: slides state (replaces local assets)
+  const [slides, setSlides] = useState<string[]>([]);
+
   const sliderRef = useRef<FlatList>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /* ================= BACK HANDLER ================= */
   useFocusEffect(
     useCallback(() => {
       const backAction = () => {
@@ -51,6 +48,20 @@ export default function MyRoleScreen() {
     }, []),
   );
 
+  /* ================= FETCH SLIDES ================= */
+  const fetchSlides = async () => {
+    const { data, error } = await supabase
+      .from("hero_images")
+      .select("image_path")
+      .eq("screen", "home")
+      .order("title", { ascending: true });
+
+    if (!error && data) {
+      setSlides(data.map((item) => item.image_path));
+    }
+  };
+
+  /* ================= COUNTS ================= */
   const fetchCounts = async () => {
     const { data } = await supabase.auth.getUser();
     const email = data.user?.email;
@@ -81,6 +92,7 @@ export default function MyRoleScreen() {
 
   useEffect(() => {
     fetchCounts();
+    fetchSlides(); // ✅ fetch slides once
   }, []);
 
   useFocusEffect(
@@ -95,7 +107,10 @@ export default function MyRoleScreen() {
     setRefreshing(false);
   }, []);
 
+  /* ================= AUTO SCROLL ================= */
   useEffect(() => {
+    if (slides.length === 0) return;
+
     autoScrollRef.current = setInterval(() => {
       const next = (activeSlide + 1) % slides.length;
       sliderRef.current?.scrollToIndex({ index: next, animated: true });
@@ -105,7 +120,7 @@ export default function MyRoleScreen() {
     return () => {
       if (autoScrollRef.current) clearInterval(autoScrollRef.current);
     };
-  }, [activeSlide]);
+  }, [activeSlide, slides.length]);
 
   const handleLogout = () => {
     Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
@@ -222,7 +237,7 @@ export default function MyRoleScreen() {
                   )
                 }
                 renderItem={({ item }) => (
-                  <Image source={item} style={styles.slideImage} />
+                  <Image source={{ uri: item }} style={styles.slideImage} />
                 )}
               />
 
@@ -256,7 +271,7 @@ export default function MyRoleScreen() {
         )}
       />
 
-      {/* 🔔 CUSTOMER CARE BUTTON (UPDATED ONLY) */}
+      {/* CUSTOMER CARE */}
       <View style={styles.customerCareWrapper}>
         <TouchableOpacity
           style={styles.customerCareBtn}
@@ -305,11 +320,10 @@ export default function MyRoleScreen() {
   );
 }
 
-/* ================= STYLES ================= */
+/* ================= STYLES (UNCHANGED) ================= */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-
   header: {
     height: 72,
     paddingHorizontal: 20,
@@ -318,17 +332,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 14 },
   logo: { width: 190, height: 64, resizeMode: "contain" },
-
   bellIcon: { position: "relative" },
-
   badge: {
     position: "absolute",
     top: -6,
@@ -340,13 +346,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   badgeText: {
     color: "#FFD700",
     fontWeight: "800",
     fontSize: 12,
   },
-
   overlay: {
     position: "absolute",
     top: 0,
@@ -355,7 +359,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 10,
   },
-
   menu: {
     position: "absolute",
     top: 72,
@@ -366,19 +369,15 @@ const styles = StyleSheet.create({
     width: 150,
     zIndex: 20,
   },
-
   menuItem: { padding: 14 },
   menuText: { fontSize: 15, fontWeight: "600" },
-
   sliderWrapper: {
     height: SLIDER_HEIGHT,
     margin: 16,
     borderRadius: 18,
     overflow: "hidden",
   },
-
   slideImage: { width: width - 32, height: SLIDER_HEIGHT },
-
   dots: {
     position: "absolute",
     bottom: 10,
@@ -386,7 +385,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
   },
-
   dot: {
     width: 7,
     height: 7,
@@ -394,15 +392,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#ccc",
     marginHorizontal: 4,
   },
-
   activeDot: { backgroundColor: "#000" },
-
-  summaryRow: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    gap: 12,
-  },
-
+  summaryRow: { flexDirection: "row", marginHorizontal: 16, gap: 12 },
   summaryBox: {
     flex: 1,
     borderRadius: 16,
@@ -411,21 +402,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9fafb",
     borderWidth: 1,
   },
-
   assignedBox: { borderColor: "#f97316" },
   completedBox: { borderColor: "#16a34a" },
-
   summaryTitle: { fontWeight: "700", marginBottom: 6 },
-
   summaryCount: { fontSize: 22, fontWeight: "800" },
-
-  /* ✅ UPDATED CUSTOMER CARE */
   customerCareWrapper: {
     alignItems: "flex-end",
     paddingHorizontal: 40,
-    marginBottom: 12, // moved up
+    marginBottom: 12,
   },
-
   customerCareBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -437,27 +422,19 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     backgroundColor: "#fff",
   },
-
-  customerCareText: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
+  customerCareText: { fontSize: 14, fontWeight: "800" },
   fixedButtonWrapper: {
     paddingHorizontal: 40,
     paddingBottom: 10,
     backgroundColor: "#fff",
   },
-
   primaryBtn: {
     backgroundColor: "#FFD700",
     paddingVertical: 12,
     borderRadius: 16,
     alignItems: "center",
   },
-
   primaryBtnText: { fontWeight: "800", fontSize: 15 },
-
   footer: {
     height: 70,
     backgroundColor: "#ffffff",
@@ -465,18 +442,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
   },
-
   footerItem: { alignItems: "center" },
-
-  footerText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "600",
-  },
-
-  footerTextActive: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: "800",
-  },
+  footerText: { fontSize: 12, marginTop: 4, fontWeight: "600" },
+  footerTextActive: { fontSize: 12, marginTop: 4, fontWeight: "800" },
 });

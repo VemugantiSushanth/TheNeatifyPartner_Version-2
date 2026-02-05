@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   View,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { supabase } from "./supabase";
 
@@ -53,52 +55,60 @@ export default function SignupScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require("../assets/images/logo.png")}
-          style={styles.logo}
-        />
-      </View>
-
-      <Input
-        icon={<User />}
-        placeholder="Full Name"
-        value={fullName}
-        onChangeText={setFullName}
-      />
-      <Input
-        icon={<Mail />}
-        placeholder="Email Address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <Input
-        icon={<Phone />}
-        placeholder="Phone Number"
-        value={phone}
-        onChangeText={setPhone}
-      />
-      <Input
-        icon={<Lock />}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <TouchableOpacity
-        style={styles.primaryBtn}
-        onPress={handleSignup}
-        disabled={loading}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1, backgroundColor: "#FFFFFF" }}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
-        {loading ? (
-          <ActivityIndicator color="#000" />
-        ) : (
-          <Text style={styles.primaryBtnText}>Create Account</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+        <View style={styles.header}>
+          <Image
+            source={require("../assets/images/logo.png")}
+            style={styles.logo}
+          />
+        </View>
+
+        <Input
+          icon={<User />}
+          placeholder="Full Name"
+          value={fullName}
+          onChangeText={setFullName}
+        />
+        <Input
+          icon={<Mail />}
+          placeholder="Email Address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <Input
+          icon={<Phone />}
+          placeholder="Phone Number"
+          value={phone}
+          onChangeText={setPhone}
+        />
+        <Input
+          icon={<Lock />}
+          placeholder="Password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={handleSignup}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={styles.primaryBtnText}>Create Account</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -106,7 +116,11 @@ function Input({ icon, ...props }: any) {
   return (
     <View style={styles.inputContainer}>
       {icon}
-      <TextInput style={{ flex: 1 }} {...props} />
+      <TextInput
+        style={styles.input}
+        placeholderTextColor="#9ca3af"
+        {...props}
+      />
     </View>
   );
 }
@@ -116,6 +130,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 25,
     paddingTop: 150,
     backgroundColor: "#FFFFFF",
+    flexGrow: 1,
   },
   header: {
     alignItems: "center",
@@ -135,6 +150,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 15,
     gap: 10,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: "#000000", // ✅ REQUIRED
   },
   primaryBtn: {
     backgroundColor: "#FFD700",
