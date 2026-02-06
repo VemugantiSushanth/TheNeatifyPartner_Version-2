@@ -40,18 +40,13 @@ export default function AssignedServiceDetails() {
   const [workStopped, setWorkStopped] = useState(false);
 
   const [uploading, setUploading] = useState(false);
-
-  /* ✅ ADDED */
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const timerRef = useRef<number | null>(null);
-
-  /* ✅ ADDED */
   const scrollRef = useRef<ScrollView>(null);
 
   if (!booking) return null;
 
-  /* ================= KEYBOARD LISTENER (ADDED) ================= */
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
       setIsKeyboardVisible(true),
@@ -66,7 +61,6 @@ export default function AssignedServiceDetails() {
     };
   }, []);
 
-  /* ================= TIMER ================= */
   useEffect(() => {
     if (running) {
       timerRef.current = setInterval(() => {
@@ -87,7 +81,6 @@ export default function AssignedServiceDetails() {
       .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  /* ================= MAP ================= */
   const openMaps = (address: string) =>
     Linking.openURL(
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
@@ -95,7 +88,6 @@ export default function AssignedServiceDetails() {
       )}`,
     );
 
-  /* ================= CAMERA ================= */
   const openCamera = async () => {
     const p = await ImagePicker.requestCameraPermissionsAsync();
     if (!p.granted) {
@@ -140,13 +132,30 @@ export default function AssignedServiceDetails() {
 
       const imageUrl = publicData.publicUrl;
 
+      // 🔒 ONLY CHANGE STARTS HERE 🔒
+      const existingValue =
+        type === "start" ? booking.start_photo_url : booking.end_photo_url;
+
+      let urls: string[] = [];
+
+      if (existingValue) {
+        try {
+          urls = JSON.parse(existingValue);
+        } catch {
+          urls = [];
+        }
+      }
+
+      const updatedUrls = [...urls, imageUrl];
+      // 🔒 ONLY CHANGE ENDS HERE 🔒
+
       if (type === "start") {
         setBeforeImages((prev) => [...prev, localUri]);
 
         await supabase
           .from("bookings")
           .update({
-            start_photo_url: [...(booking.start_photo_url || []), imageUrl],
+            start_photo_url: JSON.stringify(updatedUrls),
           })
           .eq("id", booking.id);
       } else {
@@ -155,7 +164,7 @@ export default function AssignedServiceDetails() {
         await supabase
           .from("bookings")
           .update({
-            end_photo_url: [...(booking.end_photo_url || []), imageUrl],
+            end_photo_url: JSON.stringify(updatedUrls),
           })
           .eq("id", booking.id);
       }
@@ -163,14 +172,6 @@ export default function AssignedServiceDetails() {
       Alert.alert("Upload failed", err.message || "Unknown error");
     } finally {
       setUploading(false);
-    }
-  };
-
-  const removeImage = (index: number, type: "start" | "end") => {
-    if (type === "start") {
-      setBeforeImages((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      setAfterImages((prev) => prev.filter((_, i) => i !== index));
     }
   };
 
@@ -191,6 +192,14 @@ export default function AssignedServiceDetails() {
     }
     Keyboard.dismiss();
     setEndVerified(true);
+  };
+
+  const removeImage = (index: number, type: "start" | "end") => {
+    if (type === "start") {
+      setBeforeImages((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setAfterImages((prev) => prev.filter((_, i) => i !== index));
+    }
   };
 
   return (

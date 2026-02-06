@@ -81,6 +81,7 @@ export default function Dashboard() {
         <Ionicons name="calendar-outline" size={18} color="#000" />
         <TextInput
           placeholder="YYYY-MM-DD"
+          placeholderTextColor="#000"
           value={filterDate}
           onChangeText={(v) => {
             setFilterDate(v);
