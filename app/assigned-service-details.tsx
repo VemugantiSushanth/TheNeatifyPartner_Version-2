@@ -20,11 +20,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "./supabase";
 
 export default function AssignedServiceDetails() {
   const params = useLocalSearchParams();
   const booking = params.booking ? JSON.parse(params.booking as string) : null;
+
+  const STORAGE_KEY = booking ? `booking_${booking.id}` : "";
 
   const [startOtp, setStartOtp] = useState("");
   const [endOtp, setEndOtp] = useState("");
@@ -46,6 +49,53 @@ export default function AssignedServiceDetails() {
   const scrollRef = useRef<ScrollView>(null);
 
   if (!booking) return null;
+
+  /* ================= RESTORE LOCAL STATE ================= */
+  useEffect(() => {
+    (async () => {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        setStartOtp(d.startOtp || "");
+        setEndOtp(d.endOtp || "");
+        setStartVerified(d.startVerified || false);
+        setEndVerified(d.endVerified || false);
+        setBeforeImages(d.beforeImages || []);
+        setAfterImages(d.afterImages || []);
+        setRunning(d.running || false);
+        setSeconds(d.seconds || 0);
+        setWorkStopped(d.workStopped || false);
+      }
+    })();
+  }, []);
+
+  /* ================= SAVE STATE ON EVERY CHANGE ================= */
+  useEffect(() => {
+    AsyncStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        startOtp,
+        endOtp,
+        startVerified,
+        endVerified,
+        beforeImages,
+        afterImages,
+        running,
+        seconds,
+        workStopped,
+      }),
+    );
+  }, [
+    startOtp,
+    endOtp,
+    startVerified,
+    endVerified,
+    beforeImages,
+    afterImages,
+    running,
+    seconds,
+    workStopped,
+  ]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -98,7 +148,7 @@ export default function AssignedServiceDetails() {
     return r.canceled ? null : r.assets[0].uri;
   };
 
-  /* ================= IMAGE UPLOAD ================= */
+  /* ================= IMAGE UPLOAD (NETWORK SAFE) ================= */
   const uploadImage = async (localUri: string, type: "start" | "end") => {
     try {
       setUploading(true);
@@ -121,10 +171,7 @@ export default function AssignedServiceDetails() {
           contentType: "image/jpeg",
         });
 
-      if (error) {
-        Alert.alert("Upload failed", error.message);
-        return;
-      }
+      if (error) throw error;
 
       const { data: publicData } = supabase.storage
         .from("work-photos")
@@ -132,7 +179,8 @@ export default function AssignedServiceDetails() {
 
       const imageUrl = publicData.publicUrl;
 
-      // 🔒 ONLY CHANGE STARTS HERE 🔒
+      /* ================= EXISTING URL ARRAY ================= */
+
       const existingValue =
         type === "start" ? booking.start_photo_url : booking.end_photo_url;
 
@@ -147,10 +195,11 @@ export default function AssignedServiceDetails() {
       }
 
       const updatedUrls = [...urls, imageUrl];
-      // 🔒 ONLY CHANGE ENDS HERE 🔒
+
+      /* ================= UPDATE BOOKINGS TABLE ================= */
 
       if (type === "start") {
-        setBeforeImages((prev) => [...prev, localUri]);
+        setBeforeImages((p) => [...p, localUri]);
 
         await supabase
           .from("bookings")
@@ -159,7 +208,7 @@ export default function AssignedServiceDetails() {
           })
           .eq("id", booking.id);
       } else {
-        setAfterImages((prev) => [...prev, localUri]);
+        setAfterImages((p) => [...p, localUri]);
 
         await supabase
           .from("bookings")
@@ -169,19 +218,20 @@ export default function AssignedServiceDetails() {
           .eq("id", booking.id);
       }
     } catch (err: any) {
-      Alert.alert("Upload failed", err.message || "Unknown error");
+      Alert.alert(
+        "Slow Network",
+        "Please check your internet connection and try again.",
+      );
     } finally {
       setUploading(false);
     }
   };
 
-  /* ================= OTP ================= */
   const verifyStartOtp = () => {
     if (startOtp !== booking.startotp) {
       Alert.alert("Invalid Start OTP");
       return;
     }
-    Keyboard.dismiss();
     setStartVerified(true);
   };
 
@@ -190,16 +240,13 @@ export default function AssignedServiceDetails() {
       Alert.alert("Invalid End OTP");
       return;
     }
-    Keyboard.dismiss();
     setEndVerified(true);
   };
 
   const removeImage = (index: number, type: "start" | "end") => {
-    if (type === "start") {
-      setBeforeImages((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      setAfterImages((prev) => prev.filter((_, i) => i !== index));
-    }
+    if (type === "start")
+      setBeforeImages((p) => p.filter((_, i) => i !== index));
+    else setAfterImages((p) => p.filter((_, i) => i !== index));
   };
 
   return (
