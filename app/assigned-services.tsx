@@ -90,55 +90,57 @@ export default function AssignedServices() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {services.map((item) => (
-          <View key={item.id} style={styles.card}>
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: "/assigned-service-details",
-                  params: { booking: JSON.stringify(item) },
-                })
-              }
-            >
-              <Text style={styles.cardTitle}>{item.customer_name}</Text>
+        {services.length === 0 ? (
+          <Text style={styles.emptyText}>No Assigned Services</Text>
+        ) : (
+          services.map((item) => (
+            <View key={item.id} style={styles.card}>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/assigned-service-details",
+                    params: { booking: JSON.stringify(item) },
+                  })
+                }
+              >
+                <Text style={styles.cardTitle}>{item.customer_name}</Text>
 
-              {/* ✅ NEW: PHONE NUMBER (ONLY ADDITION) */}
-              <Text>
-                <Text style={styles.label}>Phone:</Text>{" "}
-                {item.phone_number || "N/A"}
-              </Text>
-              {/* 🔁 If column name differs, change `phone_number` here */}
+                <Text>
+                  <Text style={styles.label}>Phone:</Text>{" "}
+                  {item.phone_number || "N/A"}
+                </Text>
 
-              <Text>
-                <Text style={styles.label}>Time:</Text> {item.booking_time}
-              </Text>
+                <Text>
+                  <Text style={styles.label}>Time:</Text> {item.booking_time}
+                </Text>
 
-              <Text>
-                <Text style={styles.label}>Address:</Text> {item.full_address}
-              </Text>
+                <Text>
+                  <Text style={styles.label}>Address:</Text> {item.full_address}
+                </Text>
 
-              <View style={styles.section}>
-                <Text style={styles.label}>Services:</Text>
+                <View style={styles.section}>
+                  <Text style={styles.label}>Services:</Text>
 
-                {item.services?.map((s: any, i: number) => (
-                  <View key={i} style={styles.serviceItem}>
-                    <Text style={styles.serviceName}>• {s.title}</Text>
-                    <Text style={styles.serviceMeta}>
-                      Duration: {s.duration}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </TouchableOpacity>
+                  {item.services?.map((s: any, i: number) => (
+                    <View key={i} style={styles.serviceItem}>
+                      <Text style={styles.serviceName}>• {s.title}</Text>
+                      <Text style={styles.serviceMeta}>
+                        Duration: {s.duration}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.mapBtn}
-              onPress={() => openMaps(item.full_address)}
-            >
-              <Text style={styles.mapBtnText}>Navigate</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+              <TouchableOpacity
+                style={styles.mapBtn}
+                onPress={() => openMaps(item.full_address)}
+              >
+                <Text style={styles.mapBtnText}>Navigate</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
       </ScrollView>
 
       {/* ================= FOOTER ================= */}
@@ -235,6 +237,13 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontWeight: "700",
     fontSize: 14,
+  },
+
+  emptyText: {
+    textAlign: "center",
+    fontSize: 16,
+    marginTop: 40,
+    color: "#666",
   },
 
   footer: {
