@@ -182,14 +182,27 @@ export default function AssignedServiceDetails() {
 
       /* ================= EXISTING URL ARRAY ================= */
 
-      const existingValue =
-        type === "start" ? booking.start_photo_url : booking.end_photo_url;
+      // 🔥 Get latest booking data from database
+      const { data: latestBooking, error: fetchError } = await supabase
+        .from("bookings")
+        .select("start_photo_url, end_photo_url")
+        .eq("id", booking.id)
+        .single();
+
+      if (fetchError) throw fetchError;
 
       let urls: string[] = [];
 
+      const existingValue =
+        type === "start"
+          ? latestBooking.start_photo_url
+          : latestBooking.end_photo_url;
+
       if (existingValue) {
         try {
-          urls = JSON.parse(existingValue);
+          urls = Array.isArray(existingValue)
+            ? existingValue
+            : JSON.parse(existingValue);
         } catch {
           urls = [];
         }
@@ -205,7 +218,7 @@ export default function AssignedServiceDetails() {
         await supabase
           .from("bookings")
           .update({
-            start_photo_url: JSON.stringify(updatedUrls),
+            start_photo_url: updatedUrls,
           })
           .eq("id", booking.id);
       } else {
@@ -214,7 +227,7 @@ export default function AssignedServiceDetails() {
         await supabase
           .from("bookings")
           .update({
-            end_photo_url: JSON.stringify(updatedUrls),
+            end_photo_url: updatedUrls,
           })
           .eq("id", booking.id);
       }
