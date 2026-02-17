@@ -1,20 +1,22 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router, usePathname } from "expo-router"; // ✅ added usePathname
 import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Image,
+  ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { supabase } from "./supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { supabase } from "./supabase";
 
 export default function Dashboard() {
+  const pathname = usePathname(); // ✅ added
+
   const [data, setData] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState("");
 
@@ -113,27 +115,66 @@ export default function Dashboard() {
         ))}
       </ScrollView>
 
-      {/* ================= FOOTER ================= */}
+      {/* ================= UPDATED FOOTER ONLY ================= */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
           onPress={() => router.replace("/my-role")}
         >
-          <Ionicons name="home-outline" size={22} color="#000000" />
-          <Text style={styles.footerText}>Home</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.footerItem}>
-          <Ionicons name="calendar-outline" size={22} color="#000" />
-          <Text style={styles.footerTextActive}>Dashboard</Text>
+          <Ionicons
+            name={pathname === "/my-role" ? "home" : "home-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/my-role"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Home
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.push("/my-account")}
+          onPress={() => router.replace("/dashboard")}
         >
-          <Ionicons name="person-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Profile</Text>
+          <Ionicons
+            name={pathname === "/dashboard" ? "calendar" : "calendar-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/dashboard"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Dashboard
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.replace("/my-account")}
+        >
+          <Ionicons
+            name={pathname === "/my-account" ? "person" : "person-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/my-account"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Profile
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

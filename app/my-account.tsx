@@ -1,23 +1,25 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router, usePathname } from "expo-router"; // ✅ added usePathname
 import { useEffect, useState } from "react";
 import {
   Alert,
   Image,
+  Linking,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  View,
-  StatusBar,
-  ScrollView,
   TouchableOpacity,
-  Linking,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { supabase } from "./supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "./supabase";
 
 /* ================= SCREEN ================= */
 
 export default function MyAccountScreen() {
+  const pathname = usePathname(); // ✅ added
+
   const [name, setname] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -30,21 +32,30 @@ export default function MyAccountScreen() {
       const { data } = await supabase.auth.getUser();
       if (!data.user) return;
 
+      const userId = data.user.id;
+
       setEmail(data.user.email ?? "");
 
       const { data: profile } = await supabase
         .from("staff_profile")
         .select("*")
-        .eq("id", data.user.id)
+        .eq("id", userId)
         .single();
 
       if (profile) {
         setname(profile.name ?? "");
         setPhone(profile.phone ?? "");
         setGender(profile.gender ?? null);
-        setAvatarUrl(
-          profile.avatar_url ? `${profile.avatar_url}?t=${Date.now()}` : null,
-        );
+
+        if (profile.avatar_url) {
+          const { data: publicUrlData } = supabase.storage
+            .from("avatars")
+            .getPublicUrl(profile.avatar_url);
+
+          setAvatarUrl(`${publicUrlData.publicUrl}?t=${Date.now()}`);
+        } else {
+          setAvatarUrl(null);
+        }
       }
     };
 
@@ -142,30 +153,66 @@ export default function MyAccountScreen() {
         </View>
       </ScrollView>
 
-      {/* ================= FOOTER ================= */}
+      {/* ================= UPDATED FOOTER ONLY ================= */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
           onPress={() => router.replace("/my-role")}
         >
-          <Ionicons name="home-outline" size={22} color="#000000" />
-          <Text style={styles.footerText}>Home</Text>
+          <Ionicons
+            name={pathname === "/my-role" ? "home" : "home-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/my-role"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Home
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.push("/dashboard")}
+          onPress={() => router.replace("/dashboard")}
         >
-          <Ionicons name="calendar-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Dashboard</Text>
+          <Ionicons
+            name={pathname === "/dashboard" ? "calendar" : "calendar-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/dashboard"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Dashboard
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.push("/my-account")}
+          onPress={() => router.replace("/my-account")}
         >
-          <Ionicons name="person-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Profile</Text>
+          <Ionicons
+            name={pathname === "/my-account" ? "person" : "person-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/my-account"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Profile
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -258,7 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  /* CUSTOMER CARE */
   customerCareWrap: {
     alignItems: "flex-end",
     marginTop: 24,
@@ -299,6 +345,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontWeight: "600",
+    color: "#000",
+  },
+
+  footerTextActive: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: "800",
     color: "#000",
   },
 });

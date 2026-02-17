@@ -1,36 +1,35 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useFocusEffect, usePathname } from "expo-router"; // ✅ added usePathname
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
+  Alert,
+  BackHandler,
+  Dimensions,
   FlatList,
   Image,
-  Dimensions,
-  BackHandler,
-  RefreshControl,
-  Alert,
-  Pressable,
-  StatusBar,
   Linking,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
-import { supabase } from "./supabase";
-import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "./supabase";
 
 const { height, width } = Dimensions.get("window");
 const SLIDER_HEIGHT = height * 0.42;
 
 export default function MyRoleScreen() {
+  const pathname = usePathname(); // ✅ added
+
   const [newCount, setNewCount] = useState(0);
   const [assignedCount, setAssignedCount] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
   const [activeSlide, setActiveSlide] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-
-  // ✅ NEW: slides state (replaces local assets)
   const [slides, setSlides] = useState<string[]>([]);
 
   const sliderRef = useRef<FlatList>(null);
@@ -92,7 +91,7 @@ export default function MyRoleScreen() {
 
   useEffect(() => {
     fetchCounts();
-    fetchSlides(); // ✅ fetch slides once
+    fetchSlides();
   }, []);
 
   useFocusEffect(
@@ -136,7 +135,6 @@ export default function MyRoleScreen() {
     ]);
   };
 
-  /* 📞 CUSTOMER CARE */
   const handleCustomerCare = () => {
     Alert.alert("Customer Care", "+91 7617618567", [
       { text: "Cancel", style: "cancel" },
@@ -189,40 +187,7 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
-            {showMenu && (
-              <Pressable
-                style={styles.overlay}
-                onPress={() => setShowMenu(false)}
-              />
-            )}
-
-            {showMenu && (
-              <View style={styles.menu}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    setShowMenu(false);
-                    router.push("/my-account");
-                  }}
-                >
-                  <Text style={styles.menuText}>My Account</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    setShowMenu(false);
-                    handleLogout();
-                  }}
-                >
-                  <Text style={[styles.menuText, { color: "red" }]}>
-                    Logout
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* SLIDER */}
+            {/* SLIDER + SUMMARY (UNCHANGED) */}
             <View style={styles.sliderWrapper}>
               <FlatList
                 ref={sliderRef}
@@ -251,7 +216,6 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
-            {/* SUMMARY */}
             <View style={styles.summaryRow}>
               <View style={[styles.summaryBox, styles.assignedBox]}>
                 <Text style={styles.summaryTitle}>Assigned</Text>
@@ -293,27 +257,66 @@ export default function MyRoleScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* FOOTER */}
+      {/* ✅ UPDATED FOOTER ONLY */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.footerItem}>
-          <Ionicons name="home-outline" size={22} color="#000000" />
-          <Text style={styles.footerTextActive}>Home</Text>
+        <TouchableOpacity
+          style={styles.footerItem}
+          onPress={() => router.replace("/my-role")}
+        >
+          <Ionicons
+            name={pathname === "/my-role" ? "home" : "home-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/my-role"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Home
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.push("/dashboard")}
+          onPress={() => router.replace("/dashboard")}
         >
-          <Ionicons name="calendar-outline" size={22} color="#000000" />
-          <Text style={styles.footerText}>Dashboard</Text>
+          <Ionicons
+            name={pathname === "/dashboard" ? "calendar" : "calendar-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/dashboard"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Dashboard
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.push("/my-account")}
+          onPress={() => router.replace("/my-account")}
         >
-          <Ionicons name="person-outline" size={22} color="#000" />
-          <Text style={styles.footerText}>Profile</Text>
+          <Ionicons
+            name={pathname === "/my-account" ? "person" : "person-outline"}
+            size={22}
+            color="#000"
+          />
+          <Text
+            style={
+              pathname === "/my-account"
+                ? styles.footerTextActive
+                : styles.footerText
+            }
+          >
+            Profile
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
