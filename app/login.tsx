@@ -1,9 +1,11 @@
+import * as LocalAuthentication from "expo-local-authentication";
 import { router } from "expo-router";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react"; // 🔹 CHANGE
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,9 +15,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Image,
 } from "react-native";
-import * as LocalAuthentication from "expo-local-authentication";
 import { supabase } from "./supabase";
 
 export default function LoginScreen() {
@@ -24,31 +24,71 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 🔹 CHANGE: session tracking
+  const [sessionExists, setSessionExists] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
   /**
-   * 🔐 Biometric / PIN Authentication
+   * 🔹 CHANGE: Check session AND listen to auth state
+   */
+  useEffect(() => {
+    checkSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session) {
+          setSessionExists(true);
+        } else {
+          setSessionExists(false);
+        }
+        setCheckingSession(false);
+      },
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  /**
+   * 🔹 CHANGE: Check existing session
+   */
+  const checkSession = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session) {
+      setSessionExists(true);
+    }
+
+    setCheckingSession(false);
+  };
+
+  /**
+   * 🔹 CHANGE: Proper biometric / PIN / no-lock handling
    */
   const verifyDeviceSecurity = async () => {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
+      // ✅ If no lock at all → allow access
       if (!hasHardware || !isEnrolled) {
-        Alert.alert(
-          "Security Required",
-          "Please enable fingerprint, face ID, or device PIN to continue.",
-        );
-        return false;
+        return true;
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Verify to access Neatify Staff",
-        fallbackLabel: "Use Device PIN",
+        promptMessage: "Unlock Neatify Staff",
+        fallbackLabel: "Use PIN",
         cancelLabel: "Cancel",
+        disableDeviceFallback: false,
+        requireConfirmation: false,
       });
 
       return result.success;
-    } catch (error) {
-      return false;
+    } catch {
+      return true;
     }
   };
 
@@ -71,19 +111,14 @@ export default function LoginScreen() {
 
       if (error) throw error;
 
-      // 👉 After successful login → verify biometric / PIN
       const verified = await verifyDeviceSecurity();
 
       if (!verified) {
         await supabase.auth.signOut();
-        Alert.alert(
-          "Verification Failed",
-          "Security verification is required to continue.",
-        );
+        Alert.alert("Verification Failed", "Device verification required.");
         return;
       }
 
-      // ✅ All good → go to next page
       router.replace("./my-role");
     } catch (err: any) {
       Alert.alert("Login Failed", err.message);
@@ -92,6 +127,53 @@ export default function LoginScreen() {
     }
   };
 
+  /**
+   * 🔹 CHANGE: Unlock handler (no email/password)
+   */
+  const handleUnlock = async () => {
+    const verified = await verifyDeviceSecurity();
+
+    if (verified) {
+      router.replace("./my-role");
+    } else {
+      Alert.alert("Verification Failed", "Unable to unlock.");
+    }
+  };
+
+  /**
+   * 🔹 CHANGE: Loader while checking session
+   */
+  if (checkingSession) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#FFD700" />
+      </View>
+    );
+  }
+
+  /**
+   * 🔹 CHANGE: Show Unlock screen if session exists
+   */
+  if (sessionExists) {
+    return (
+      <View style={styles.unlockContainer}>
+        <StatusBar barStyle="dark-content" />
+
+        <Image
+          source={require("../assets/images/logo.png")}
+          style={styles.logo}
+        />
+
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleUnlock}>
+          <Text style={styles.primaryBtnText}>Unlock</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  /**
+   * DEFAULT: Login Screen
+   */
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -149,21 +231,13 @@ export default function LoginScreen() {
             <Text style={styles.primaryBtnText}>Log In</Text>
           )}
         </TouchableOpacity>
-
-        {/* FOOTER */}
-        {/* <View style={styles.footer}>
-          <Text>Don't have an account?</Text>
-          <TouchableOpacity onPress={() => router.push("/signup")}>
-            <Text style={styles.linkText}> Sign Up</Text>
-          </TouchableOpacity>
-        </View> */}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 /**
- * 🎨 Styles
+ * Styles
  */
 const styles = StyleSheet.create({
   container: {
@@ -171,20 +245,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 25,
     justifyContent: "center",
   },
+
+  unlockContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    padding: 25,
+  },
+
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   header: {
     alignItems: "center",
     marginBottom: 40,
   },
+
   logo: {
     width: 300,
     height: 100,
     resizeMode: "contain",
     marginBottom: 10,
   },
+
   subtitle: {
     fontSize: 15,
     color: "#666",
   },
+
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -195,29 +287,25 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     gap: 10,
   },
+
   input: {
     flex: 1,
     fontSize: 16,
     color: "#000000",
   },
+
   primaryBtn: {
     backgroundColor: "#FFD700",
     height: 56,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    width: "100%",
   },
+
   primaryBtnText: {
     color: "#000",
     fontSize: 17,
     fontWeight: "700",
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 25,
-  },
-  linkText: {
-    fontWeight: "800",
   },
 });

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect, usePathname } from "expo-router"; // ✅ added usePathname
+import { router, useFocusEffect, usePathname } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -8,9 +8,11 @@ import {
   FlatList,
   Image,
   Linking,
+  Pressable,
   RefreshControl,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -22,7 +24,7 @@ const { height, width } = Dimensions.get("window");
 const SLIDER_HEIGHT = height * 0.42;
 
 export default function MyRoleScreen() {
-  const pathname = usePathname(); // ✅ added
+  const pathname = usePathname();
 
   const [newCount, setNewCount] = useState(0);
   const [assignedCount, setAssignedCount] = useState(0);
@@ -31,6 +33,7 @@ export default function MyRoleScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [slides, setSlides] = useState<string[]>([]);
+  const [isAvailable, setIsAvailable] = useState(false);
 
   const sliderRef = useRef<FlatList>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -49,18 +52,16 @@ export default function MyRoleScreen() {
 
   /* ================= FETCH SLIDES ================= */
   const fetchSlides = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("hero_images")
       .select("image_path")
       .eq("screen", "home")
       .order("title", { ascending: true });
 
-    if (!error && data) {
-      setSlides(data.map((item) => item.image_path));
-    }
+    if (data) setSlides(data.map((item) => item.image_path));
   };
 
-  /* ================= COUNTS ================= */
+  /* ================= FETCH COUNTS ================= */
   const fetchCounts = async () => {
     const { data } = await supabase.auth.getUser();
     const email = data.user?.email;
@@ -89,22 +90,31 @@ export default function MyRoleScreen() {
     setCompletedCount(completed || 0);
   };
 
+  /* ================= FETCH AVAILABILITY ================= */
+  const fetchAvailability = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+
+    const { data } = await supabase
+      .from("staff_profile")
+      .select("is_available")
+      .eq("id", userData.user.id)
+      .single();
+
+    setIsAvailable(data?.is_available ?? false);
+  };
+
+  /* ================= INITIAL LOAD ================= */
   useEffect(() => {
-    fetchCounts();
     fetchSlides();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchCounts();
+      fetchAvailability();
     }, []),
   );
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchCounts();
-    setRefreshing(false);
-  }, []);
 
   /* ================= AUTO SCROLL ================= */
   useEffect(() => {
@@ -120,6 +130,19 @@ export default function MyRoleScreen() {
       if (autoScrollRef.current) clearInterval(autoScrollRef.current);
     };
   }, [activeSlide, slides.length]);
+
+  /* ================= UPDATE AVAILABILITY ================= */
+  const handleToggleAvailability = async (value: boolean) => {
+    setIsAvailable(value);
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+
+    await supabase
+      .from("staff_profile")
+      .update({ is_available: value })
+      .eq("id", userData.user.id);
+  };
 
   const handleLogout = () => {
     Alert.alert("Confirm Logout", "Are you sure you want to logout?", [
@@ -146,12 +169,12 @@ export default function MyRoleScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <FlatList
         data={[{ key: "main" }]}
         contentContainerStyle={{ paddingBottom: 200 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={fetchCounts} />
         }
         renderItem={() => (
           <View style={styles.container}>
@@ -187,7 +210,41 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
-            {/* SLIDER + SUMMARY (UNCHANGED) */}
+            {/* DROPDOWN */}
+            {showMenu && (
+              <Pressable
+                style={styles.overlay}
+                onPress={() => setShowMenu(false)}
+              />
+            )}
+
+            {showMenu && (
+              <View style={styles.menu}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    router.push("/my-account");
+                  }}
+                >
+                  <Text style={styles.menuText}>My Account</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowMenu(false);
+                    handleLogout();
+                  }}
+                >
+                  <Text style={[styles.menuText, { color: "red" }]}>
+                    Logout
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* SLIDER */}
             <View style={styles.sliderWrapper}>
               <FlatList
                 ref={sliderRef}
@@ -216,6 +273,7 @@ export default function MyRoleScreen() {
               </View>
             </View>
 
+            {/* SUMMARY */}
             <View style={styles.summaryRow}>
               <View style={[styles.summaryBox, styles.assignedBox]}>
                 <Text style={styles.summaryTitle}>Assigned</Text>
@@ -231,6 +289,16 @@ export default function MyRoleScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* SWITCH */}
+            <View style={styles.availabilityWrapper}>
+              <Text style={styles.availabilityText}>Available for Work</Text>
+              <Switch
+                value={isAvailable}
+                onValueChange={handleToggleAvailability}
+                trackColor={{ false: "#ede4e4", true: "#0fd357" }}
+              />
+            </View>
           </View>
         )}
       />
@@ -240,7 +308,6 @@ export default function MyRoleScreen() {
         <TouchableOpacity
           style={styles.customerCareBtn}
           onPress={handleCustomerCare}
-          activeOpacity={0.8}
         >
           <Ionicons name="headset-outline" size={18} color="#000" />
           <Text style={styles.customerCareText}>Customer Care</Text>
@@ -257,7 +324,7 @@ export default function MyRoleScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ✅ UPDATED FOOTER ONLY */}
+      {/* FOOTER */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
@@ -323,7 +390,7 @@ export default function MyRoleScreen() {
   );
 }
 
-/* ================= STYLES (UNCHANGED) ================= */
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -349,11 +416,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeText: {
-    color: "#FFD700",
-    fontWeight: "800",
-    fontSize: 12,
-  },
+  badgeText: { color: "#FFD700", fontWeight: "800", fontSize: 12 },
+
   overlay: {
     position: "absolute",
     top: 0,
@@ -374,6 +438,7 @@ const styles = StyleSheet.create({
   },
   menuItem: { padding: 14 },
   menuText: { fontSize: 15, fontWeight: "600" },
+
   sliderWrapper: {
     height: SLIDER_HEIGHT,
     margin: 16,
@@ -381,21 +446,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   slideImage: { width: width - 32, height: SLIDER_HEIGHT },
-  dots: {
-    position: "absolute",
-    bottom: 10,
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#ccc",
-    marginHorizontal: 4,
-  },
-  activeDot: { backgroundColor: "#000" },
+
   summaryRow: { flexDirection: "row", marginHorizontal: 16, gap: 12 },
   summaryBox: {
     flex: 1,
@@ -409,6 +460,16 @@ const styles = StyleSheet.create({
   completedBox: { borderColor: "#16a34a" },
   summaryTitle: { fontWeight: "700", marginBottom: 6 },
   summaryCount: { fontSize: 22, fontWeight: "800" },
+
+  availabilityWrapper: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginHorizontal: 40,
+    marginTop: 20,
+  },
+  availabilityText: { fontSize: 16, fontWeight: "700" },
+
   customerCareWrapper: {
     alignItems: "flex-end",
     paddingHorizontal: 40,
@@ -426,6 +487,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   customerCareText: { fontSize: 14, fontWeight: "800" },
+
   fixedButtonWrapper: {
     paddingHorizontal: 40,
     paddingBottom: 10,
@@ -433,11 +495,12 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     backgroundColor: "#FFD700",
-    paddingVertical: 12,
-    borderRadius: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
     alignItems: "center",
   },
-  primaryBtnText: { fontWeight: "800", fontSize: 15 },
+  primaryBtnText: { fontWeight: "800", fontSize: 16 },
+
   footer: {
     height: 70,
     backgroundColor: "#ffffff",
@@ -448,4 +511,24 @@ const styles = StyleSheet.create({
   footerItem: { alignItems: "center" },
   footerText: { fontSize: 12, marginTop: 4, fontWeight: "600" },
   footerTextActive: { fontSize: 12, marginTop: 4, fontWeight: "800" },
+
+  dots: {
+    position: "absolute",
+    bottom: 10,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#ccc",
+    marginHorizontal: 4,
+  },
+
+  activeDot: {
+    backgroundColor: "#000",
+  },
 });
