@@ -1,27 +1,26 @@
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  StatusBar,
-  Alert,
-  Linking,
-  TextInput,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Alert,
+  Image,
   Keyboard,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as ImageManipulator from "expo-image-manipulator";
 import { supabase } from "./supabase";
 
 export default function AssignedServiceDetails() {
@@ -46,7 +45,12 @@ export default function AssignedServiceDetails() {
   const [uploading, setUploading] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  const timerRef = useRef<number | null>(null);
+  // ================= TIMER CHANGE =================
+  const [workStartedAt, setWorkStartedAt] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ================= TIMER CHANGE END =================
+
   const scrollRef = useRef<ScrollView>(null);
 
   if (!booking) return null;
@@ -67,6 +71,19 @@ export default function AssignedServiceDetails() {
         setSeconds(d.seconds || 0);
         setWorkStopped(d.workStopped || false);
       }
+
+      // ================= TIMER CHANGE =================
+      const { data: latest } = await supabase
+        .from("bookings")
+        .select("work_started_at")
+        .eq("id", booking.id)
+        .single();
+
+      if (latest?.work_started_at) {
+        setWorkStartedAt(latest.work_started_at);
+        setRunning(true);
+      }
+      // ================= TIMER CHANGE END =================
     })();
   }, []);
 
@@ -111,25 +128,38 @@ export default function AssignedServiceDetails() {
       hideSub.remove();
     };
   }, []);
-
   useEffect(() => {
-    if (running) {
-      timerRef.current = setInterval(() => {
-        setSeconds((s) => s + 1);
-      }, 1000);
-    }
+    if (!workStartedAt) return;
+
+    const updateTimer = () => {
+      const diff = Math.floor(
+        (Date.now() - new Date(workStartedAt).getTime()) / 1000,
+      );
+      setSeconds(diff);
+    };
+
+    updateTimer();
+
+    timerRef.current = setInterval(updateTimer, 1000);
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [running]);
+  }, [workStartedAt]);
+  // ================= TIMER CHANGE END =================
 
   const formatDuration = (t: number) => {
     const h = Math.floor(t / 3600);
     const m = Math.floor((t % 3600) / 60);
     const s = t % 60;
-    return `${h.toString().padStart(2, "0")}:${m
-      .toString()
-      .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+
+    let result = "";
+
+    if (h > 0) result += `${h} hr `;
+    if (m > 0) result += `${m} min `;
+    if (s > 0) result += `${s} sec`;
+
+    return result.trim();
   };
 
   const openMaps = (address: string) =>
@@ -390,14 +420,18 @@ export default function AssignedServiceDetails() {
                       {
                         text: "OK",
                         onPress: async () => {
+                          const startTime = new Date().toISOString();
                           await supabase
                             .from("bookings")
                             .update({
-                              work_started_at: new Date().toISOString(),
+                              work_started_at: startTime,
                             })
                             .eq("id", booking.id);
 
+                          // ================= TIMER CHANGE =================
+                          setWorkStartedAt(startTime);
                           setRunning(true);
+                          // ================= TIMER CHANGE END =================
                         },
                       },
                     ],
@@ -416,8 +450,27 @@ export default function AssignedServiceDetails() {
               <TouchableOpacity
                 style={styles.completeBtn}
                 onPress={() => {
-                  setRunning(false);
-                  setWorkStopped(true);
+                  if (timerRef.current) {
+                    clearInterval(timerRef.current);
+                    timerRef.current = null;
+                  }
+                  setWorkStartedAt(null);
+
+                  Alert.alert(
+                    "Work Completed 🎉",
+                    `You have successfully completed the work in ${formatDuration(
+                      seconds,
+                    )}.\n\nTo finalize the service, please upload the end photo and verify with OTP.`,
+                    [
+                      {
+                        text: "Proceed",
+                        onPress: () => {
+                          setRunning(false);
+                          setWorkStopped(true);
+                        },
+                      },
+                    ],
+                  );
                 }}
               >
                 <Text>Work Complete</Text>
@@ -510,7 +563,7 @@ export default function AssignedServiceDetails() {
                     .from("bookings")
                     .update({
                       work_status: "COMPLETED",
-                      worked_duration: seconds,
+                      worked_duration: formatDuration(seconds),
                       work_ended_at: new Date().toISOString(),
                     })
                     .eq("id", booking.id);

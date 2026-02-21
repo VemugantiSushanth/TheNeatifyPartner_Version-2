@@ -38,14 +38,19 @@ export default function MyRoleScreen() {
   const sliderRef = useRef<FlatList>(null);
   const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* ================= BACK HANDLER ================= */
+  /* ================= BACK HANDLER (FIXED) ================= */
   useFocusEffect(
     useCallback(() => {
       const backAction = () => {
-        router.replace("/login");
-        return true;
+        if (router.canGoBack()) {
+          router.back();
+          return true;
+        }
+        return false; // allow Android default behavior
       };
+
       const sub = BackHandler.addEventListener("hardwareBackPress", backAction);
+
       return () => sub.remove();
     }, []),
   );
@@ -104,7 +109,6 @@ export default function MyRoleScreen() {
     setIsAvailable(data?.is_available ?? false);
   };
 
-  /* ================= INITIAL LOAD ================= */
   useEffect(() => {
     fetchSlides();
   }, []);
@@ -324,11 +328,11 @@ export default function MyRoleScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* FOOTER */}
+      {/* FOOTER (FIXED) */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.replace("/my-role")}
+          onPress={() => router.push("/my-role")}
         >
           <Ionicons
             name={pathname === "/my-role" ? "home" : "home-outline"}
@@ -348,7 +352,7 @@ export default function MyRoleScreen() {
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.replace("/dashboard")}
+          onPress={() => router.push("/dashboard")}
         >
           <Ionicons
             name={pathname === "/dashboard" ? "calendar" : "calendar-outline"}
@@ -368,7 +372,7 @@ export default function MyRoleScreen() {
 
         <TouchableOpacity
           style={styles.footerItem}
-          onPress={() => router.replace("/my-account")}
+          onPress={() => router.push("/my-account")}
         >
           <Ionicons
             name={pathname === "/my-account" ? "person" : "person-outline"}

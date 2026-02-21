@@ -19,10 +19,15 @@ export default function Dashboard() {
 
   const [data, setData] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "date" | "name">("recent");
 
   useEffect(() => {
     loadCompleted();
   }, []);
+
+  useEffect(() => {
+    loadCompleted(filterDate || undefined);
+  }, [sortBy]);
 
   /* ================= LOAD COMPLETED ================= */
   const loadCompleted = async (date?: string) => {
@@ -31,10 +36,16 @@ export default function Dashboard() {
 
     let query = supabase
       .from("bookings")
-      .select("customer_name,email,work_ended_at")
+      .select("customer_name,email,work_ended_at,worked_duration")
       .eq("assigned_staff_email", email)
-      .eq("work_status", "COMPLETED")
-      .order("work_ended_at", { ascending: false });
+      .eq("work_status", "COMPLETED");
+    if (sortBy === "recent") {
+      query = query.order("work_ended_at", { ascending: false });
+    } else if (sortBy === "date") {
+      query = query.order("work_ended_at", { ascending: true });
+    } else if (sortBy === "name") {
+      query = query.order("customer_name", { ascending: true });
+    }
 
     if (date) {
       query = query
@@ -79,19 +90,42 @@ export default function Dashboard() {
       </View>
 
       {/* ================= FILTER ================= */}
-      <View style={styles.filterBox}>
-        <Ionicons name="calendar-outline" size={18} color="#000" />
-        <TextInput
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#000"
-          value={filterDate}
-          onChangeText={(v) => {
-            setFilterDate(v);
-            if (v.length === 10) loadCompleted(v);
-            if (v.length === 0) loadCompleted();
-          }}
-          style={styles.filterInput}
-        />
+      <View style={styles.filterRow}>
+        <View style={styles.filterBox}>
+          <Ionicons name="calendar-outline" size={18} color="#000" />
+          <TextInput
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#000"
+            value={filterDate}
+            onChangeText={(v) => {
+              setFilterDate(v);
+              if (v.length === 10) loadCompleted(v);
+              if (v.length === 0) loadCompleted();
+            }}
+            style={styles.filterInput}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.sortBtn}
+          onPress={() =>
+            setSortBy(
+              sortBy === "recent"
+                ? "date"
+                : sortBy === "date"
+                  ? "name"
+                  : "recent",
+            )
+          }
+        >
+          <Text style={styles.sortText}>
+            {sortBy === "recent"
+              ? "Recent"
+              : sortBy === "date"
+                ? "Oldest"
+                : "Name"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* ================= BODY ================= */}
@@ -108,6 +142,11 @@ export default function Dashboard() {
               <Text style={styles.date}>
                 Completed: {formatDateTime(item.work_ended_at)}
               </Text>
+              {item.worked_duration && (
+                <Text style={styles.worked}>
+                  Worked Time: {item.worked_duration}
+                </Text>
+              )}
             </View>
 
             <Text style={styles.completed}>COMPLETED</Text>
@@ -221,14 +260,13 @@ const styles = StyleSheet.create({
   },
 
   filterBox: {
-    margin: 16,
+    flex: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
     borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
   },
 
   filterInput: {
@@ -303,5 +341,32 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "800",
     color: "#000",
+  },
+
+  worked: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#16a34a",
+  },
+
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 10,
+  },
+
+  sortBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    borderColor: "#000",
+    marginLeft: 10,
+  },
+
+  sortText: {
+    fontWeight: "700",
   },
 });

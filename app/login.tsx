@@ -187,7 +187,7 @@ export default function LoginScreen() {
             source={require("../assets/images/logo.png")}
             style={styles.logo}
           />
-          <Text style={styles.subtitle}>Staff Login</Text>
+          <Text style={styles.subtitle}>Partner Login</Text>
         </View>
 
         {/* EMAIL */}
