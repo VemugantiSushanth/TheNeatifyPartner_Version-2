@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { router, usePathname } from "expo-router"; // ✅ added usePathname
 import { useEffect, useState } from "react";
 import {
@@ -20,6 +21,8 @@ export default function Dashboard() {
   const [data, setData] = useState<any[]>([]);
   const [filterDate, setFilterDate] = useState("");
   const [sortBy, setSortBy] = useState<"recent" | "date" | "name">("recent");
+  const [showSortOptions, setShowSortOptions] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     loadCompleted();
@@ -92,41 +95,130 @@ export default function Dashboard() {
       {/* ================= FILTER ================= */}
       <View style={styles.filterRow}>
         <View style={styles.filterBox}>
-          <Ionicons name="calendar-outline" size={18} color="#000" />
-          <TextInput
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#000"
-            value={filterDate}
-            onChangeText={(v) => {
-              setFilterDate(v);
-              if (v.length === 10) loadCompleted(v);
-              if (v.length === 0) loadCompleted();
-            }}
-            style={styles.filterInput}
-          />
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+            onPress={() => setShowCalendar(true)}
+          >
+            <Ionicons
+              name="calendar-outline"
+              size={20}
+              color="#000"
+              style={{ marginRight: 8 }}
+            />
+
+            <TextInput
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#000"
+              value={filterDate}
+              keyboardType="number-pad"
+              maxLength={10}
+              onChangeText={(v) => {
+                const digits = v.replace(/[^0-9]/g, "");
+
+                let formatted = digits;
+
+                if (digits.length > 4) {
+                  formatted = digits.slice(0, 4) + "-" + digits.slice(4);
+                }
+                if (digits.length > 6) {
+                  formatted =
+                    digits.slice(0, 4) +
+                    "-" +
+                    digits.slice(4, 6) +
+                    "-" +
+                    digits.slice(6, 8);
+                }
+
+                setFilterDate(formatted);
+
+                if (formatted.length === 10) loadCompleted(formatted);
+                if (formatted.length === 0) loadCompleted();
+              }}
+              style={styles.filterInput}
+            />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.sortBtn}
-          onPress={() =>
-            setSortBy(
-              sortBy === "recent"
-                ? "date"
-                : sortBy === "date"
-                  ? "name"
-                  : "recent",
-            )
-          }
-        >
-          <Text style={styles.sortText}>
-            {sortBy === "recent"
-              ? "Recent"
-              : sortBy === "date"
-                ? "Oldest"
-                : "Name"}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ marginLeft: 10 }}>
+          <TouchableOpacity
+            style={styles.sortBtn}
+            onPress={() => setShowSortOptions(!showSortOptions)}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={styles.sortText}>
+                {sortBy === "recent"
+                  ? "Recent"
+                  : sortBy === "date"
+                    ? "Oldest"
+                    : "Name"}
+              </Text>
+              <Ionicons
+                name={showSortOptions ? "chevron-up" : "chevron-down"}
+                size={18}
+                color="#000"
+                style={{ marginLeft: 5 }}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {showSortOptions && (
+            <View style={styles.dropdown}>
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setSortBy("recent");
+                  setShowSortOptions(false);
+                }}
+              >
+                <Text>Recent</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setSortBy("date");
+                  setShowSortOptions(false);
+                }}
+              >
+                <Text>Oldest</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setSortBy("name");
+                  setShowSortOptions(false);
+                }}
+              >
+                <Text>Name</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
+
+      {showCalendar && (
+        <DateTimePicker
+          value={new Date()}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowCalendar(false);
+            if (selectedDate) {
+              const year = selectedDate.getFullYear();
+              const month = String(selectedDate.getMonth() + 1).padStart(
+                2,
+                "0",
+              );
+              const day = String(selectedDate.getDate()).padStart(2, "0");
+
+              const formatted = `${year}-${month}-${day}`;
+              setFilterDate(formatted);
+              loadCompleted(formatted);
+            }
+          }}
+        />
+      )}
 
       {/* ================= BODY ================= */}
       <ScrollView contentContainerStyle={styles.body}>
@@ -350,11 +442,31 @@ const styles = StyleSheet.create({
     color: "#16a34a",
   },
 
+  dropdown: {
+    position: "absolute",
+    top: 55,
+    right: 0,
+    width: 120,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    elevation: 5,
+    zIndex: 999,
+  },
+
+  dropdownItem: {
+    padding: 10,
+    borderBottomWidth: 0.5,
+    borderColor: "#eee",
+  },
+
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: 16,
     marginTop: 10,
+    zIndex: 1000,
   },
 
   sortBtn: {

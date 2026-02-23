@@ -48,11 +48,7 @@ export default function MyAccountScreen() {
         setGender(profile.gender ?? null);
 
         if (profile.avatar_url) {
-          const { data: publicUrlData } = supabase.storage
-            .from("avatars")
-            .getPublicUrl(profile.avatar_url);
-
-          setAvatarUrl(`${publicUrlData.publicUrl}?t=${Date.now()}`);
+          setAvatarUrl(`${profile.avatar_url}?t=${Date.now()}`);
         } else {
           setAvatarUrl(null);
         }
