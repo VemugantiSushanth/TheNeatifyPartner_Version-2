@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -54,6 +55,9 @@ export default function AssignedServiceDetails() {
   const scrollRef = useRef<ScrollView>(null);
 
   if (!booking) return null;
+
+  const [startPhotoSkipped, setStartPhotoSkipped] = useState(false);
+  const [endPhotoSkipped, setEndPhotoSkipped] = useState(false);
 
   /* ================= RESTORE LOCAL STATE ================= */
   useEffect(() => {
@@ -188,10 +192,26 @@ export default function AssignedServiceDetails() {
       const email = data.user?.email;
       if (!email) return;
 
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
+      // ================= COMPRESS IMAGE =================
+      const compressedImage = await ImageManipulator.manipulateAsync(
+        localUri,
+        [
+          {
+            resize: { width: 800 }, // reduce resolution (optional but recommended)
+          },
+        ],
+        {
+          compress: 0.4, // 0.1 = very low quality | 0.4 good | 0.6 medium
+          format: ImageManipulator.SaveFormat.JPEG,
+        },
+      );
+
+      // Use compressed URI
+      const compressedUri = compressedImage.uri;
+
+      const base64 = await FileSystem.readAsStringAsync(compressedUri, {
         encoding: "base64",
       });
-
       const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
       const filePath = `staff_uploads/${email}/${booking.id}/${type}_${Date.now()}.jpg`;
@@ -293,6 +313,51 @@ export default function AssignedServiceDetails() {
     else setAfterImages((p) => p.filter((_, i) => i !== index));
   };
 
+  const handleSkipPhoto = (type: "start" | "end") => {
+    Alert.alert("Why are you skipping photo?", "Select a reason", [
+      {
+        text: "Camera not working",
+        onPress: () => confirmSkip(type, "Camera not working"),
+      },
+      {
+        text: "Customer denied permission",
+        onPress: () => confirmSkip(type, "Customer denied permission"),
+      },
+      {
+        text: "App camera issue",
+        onPress: () => confirmSkip(type, "App camera issue"),
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+    ]);
+  };
+
+  const confirmSkip = async (type: "start" | "end", reason: string) => {
+    Alert.alert("Confirm Skip", `Reason: ${reason}`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Confirm",
+        onPress: async () => {
+          if (type === "start") {
+            setStartPhotoSkipped(true);
+            await supabase
+              .from("bookings")
+              .update({ start_photo_skip_reason: reason })
+              .eq("id", booking.id);
+          } else {
+            setEndPhotoSkipped(true);
+            await supabase
+              .from("bookings")
+              .update({ end_photo_skip_reason: reason })
+              .eq("id", booking.id);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <StatusBar backgroundColor="#FFD700" barStyle="dark-content" />
@@ -355,11 +420,15 @@ export default function AssignedServiceDetails() {
 
             <Text style={styles.label}>Start OTP</Text>
             <TextInput
-              style={styles.otpInput}
+              style={[
+                styles.otpInput,
+                startVerified && { backgroundColor: "#eee" },
+              ]}
               value={startOtp}
               onChangeText={setStartOtp}
               keyboardType="number-pad"
               maxLength={6}
+              editable={!startVerified}
             />
 
             {startVerified && (
@@ -405,42 +474,54 @@ export default function AssignedServiceDetails() {
                   </Text>
                   <Ionicons name="camera" size={18} />
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleSkipPhoto("start")}
+                  style={{
+                    alignSelf: "flex-end",
+                    marginTop: 6,
+                  }}
+                >
+                  <Text style={{ color: "black", fontSize: 13 }}>Skip</Text>
+                </TouchableOpacity>
               </>
             )}
 
-            {beforeImages.length > 0 && !running && !workStopped && (
-              <TouchableOpacity
-                style={styles.startBtn}
-                onPress={() => {
-                  Alert.alert(
-                    "You Are Ready To Go 🚀",
-                    "Click OK to start work",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "OK",
-                        onPress: async () => {
-                          const startTime = new Date().toISOString();
-                          await supabase
-                            .from("bookings")
-                            .update({
-                              work_started_at: startTime,
-                            })
-                            .eq("id", booking.id);
+            {(beforeImages.length > 0 || startPhotoSkipped) &&
+              !running &&
+              !workStopped && (
+                <TouchableOpacity
+                  style={styles.startBtn}
+                  onPress={() => {
+                    Alert.alert(
+                      "You Are Ready To Go 🚀",
+                      "Click OK to start work",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "OK",
+                          onPress: async () => {
+                            const startTime = new Date().toISOString();
+                            await supabase
+                              .from("bookings")
+                              .update({
+                                work_started_at: startTime,
+                              })
+                              .eq("id", booking.id);
 
-                          // ================= TIMER CHANGE =================
-                          setWorkStartedAt(startTime);
-                          setRunning(true);
-                          // ================= TIMER CHANGE END =================
+                            // ================= TIMER CHANGE =================
+                            setWorkStartedAt(startTime);
+                            setRunning(true);
+                            // ================= TIMER CHANGE END =================
+                          },
                         },
-                      },
-                    ],
-                  );
-                }}
-              >
-                <Text style={styles.btnText}>Start Work</Text>
-              </TouchableOpacity>
-            )}
+                      ],
+                    );
+                  }}
+                >
+                  <Text style={styles.btnText}>Start Work</Text>
+                </TouchableOpacity>
+              )}
 
             {running && (
               <Text style={styles.timer}>{formatDuration(seconds)}</Text>
@@ -514,20 +595,41 @@ export default function AssignedServiceDetails() {
                   <Ionicons name="camera" size={18} />
                 </TouchableOpacity>
 
-                {afterImages.length > 0 && (
+                {/* ✅ ADD SKIP BUTTON RIGHT HERE */}
+                <TouchableOpacity
+                  onPress={() => handleSkipPhoto("end")}
+                  style={{
+                    alignSelf: "flex-end",
+                    marginTop: 6,
+                  }}
+                >
+                  <Text style={{ color: "black", fontSize: 13 }}>Skip</Text>
+                </TouchableOpacity>
+
+                {(afterImages.length > 0 || endPhotoSkipped) && (
                   <>
                     <Text style={styles.label}>End OTP</Text>
+
                     <TextInput
-                      style={styles.otpInput}
+                      style={[
+                        styles.otpInput,
+                        endVerified && {
+                          backgroundColor: "#e5e5e5",
+                          color: "#777",
+                        },
+                      ]}
                       value={endOtp}
                       onChangeText={setEndOtp}
                       keyboardType="number-pad"
                       maxLength={6}
-                      /* ✅ ADDED */
+                      editable={!endVerified} // 🔥 This locks field after verification
                       onFocus={() => {
-                        setTimeout(() => {
-                          scrollRef.current?.scrollToEnd({ animated: true });
-                        }, 300);
+                        if (!endVerified) {
+                          // 🔥 Prevent scroll trigger after verified
+                          setTimeout(() => {
+                            scrollRef.current?.scrollToEnd({ animated: true });
+                          }, 300);
+                        }
                       }}
                     />
 
@@ -555,7 +657,7 @@ export default function AssignedServiceDetails() {
               </>
             )}
 
-            {endVerified && afterImages.length > 0 && (
+            {endVerified && (afterImages.length > 0 || endPhotoSkipped) && (
               <TouchableOpacity
                 style={styles.serviceDone}
                 onPress={async () => {

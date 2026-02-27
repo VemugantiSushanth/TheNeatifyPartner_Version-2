@@ -28,22 +28,22 @@ export default function LoginScreen() {
   const [sessionExists, setSessionExists] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // 🔹 OTP STATES
   const [loginMode, setLoginMode] = useState<"email" | "mobile">("email");
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+
+  // ✅ NEW STATES FOR TIMER
+  const [timer, setTimer] = useState(60);
+  const [isResendDisabled, setIsResendDisabled] = useState(false);
 
   useEffect(() => {
     checkSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session) {
-          setSessionExists(true);
-        } else {
-          setSessionExists(false);
-        }
+        if (session) setSessionExists(true);
+        else setSessionExists(false);
         setCheckingSession(false);
       },
     );
@@ -53,7 +53,27 @@ export default function LoginScreen() {
     };
   }, []);
 
-  // 🔹 Handle Android Back
+  // ✅ SAFE TIMER EFFECT (NO TYPESCRIPT ERROR)
+  useEffect(() => {
+    if (!otpSent) return;
+
+    setIsResendDisabled(true);
+    setTimer(60);
+
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setIsResendDisabled(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [otpSent]);
+
   useEffect(() => {
     const backAction = () => {
       if (loginMode === "mobile") {
@@ -61,6 +81,8 @@ export default function LoginScreen() {
         setOtpSent(false);
         setMobile("");
         setOtp("");
+        setIsResendDisabled(false);
+        setTimer(60);
         return true;
       }
       return false;
@@ -79,10 +101,7 @@ export default function LoginScreen() {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (session) {
-      setSessionExists(true);
-    }
-
+    if (session) setSessionExists(true);
     setCheckingSession(false);
   };
 
@@ -90,15 +109,10 @@ export default function LoginScreen() {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
       if (!hasHardware || !isEnrolled) return true;
 
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: "Unlock Neatify Staff",
-        fallbackLabel: "Use PIN",
-        cancelLabel: "Cancel",
-        disableDeviceFallback: false,
-        requireConfirmation: false,
       });
 
       return result.success;
@@ -107,7 +121,6 @@ export default function LoginScreen() {
     }
   };
 
-  // 🔑 EMAIL LOGIN (UNCHANGED)
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Email and password required");
@@ -128,7 +141,7 @@ export default function LoginScreen() {
 
       if (!verified) {
         await supabase.auth.signOut();
-        Alert.alert("Verification Failed", "Device verification required.");
+        Alert.alert("Verification Failed");
         return;
       }
 
@@ -140,10 +153,8 @@ export default function LoginScreen() {
     }
   };
 
-  // 🔹 CLEAN MOBILE (remove spaces, symbols)
   const getCleanMobile = () => mobile.replace(/\D/g, "");
 
-  // 🔹 CHECK NUMBER EXISTS (DB STORES WITHOUT +91)
   const checkIfMobileRegistered = async () => {
     const cleanedMobile = getCleanMobile();
 
@@ -152,10 +163,12 @@ export default function LoginScreen() {
       return false;
     }
 
+    const formattedPhone = `+91${cleanedMobile}`;
+
     const { data } = await supabase
       .from("staff_profile")
       .select("phone")
-      .eq("phone", cleanedMobile)
+      .eq("phone", formattedPhone)
       .maybeSingle();
 
     if (!data) {
@@ -166,17 +179,16 @@ export default function LoginScreen() {
     return true;
   };
 
-  // 🔹 SEND OTP (SUPABASE REQUIRES +91)
   const handleSendOtp = async () => {
     const exists = await checkIfMobileRegistered();
     if (!exists) return;
 
-    const cleanedMobile = getCleanMobile();
+    const formattedPhone = `+91${getCleanMobile()}`;
 
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithOtp({
-      phone: `+91${cleanedMobile}`,
+      phone: formattedPhone,
     });
 
     setLoading(false);
@@ -184,24 +196,24 @@ export default function LoginScreen() {
     if (error) {
       Alert.alert("Error", error.message);
     } else {
-      setOtpSent(true);
+      setOtpSent(true); // triggers timer
+      setOtp("");
       Alert.alert("Success", "OTP sent successfully");
     }
   };
 
-  // 🔹 VERIFY OTP
   const handleVerifyOtp = async () => {
     if (!otp) {
       Alert.alert("Error", "Enter OTP");
       return;
     }
 
-    const cleanedMobile = getCleanMobile();
+    const formattedPhone = `+91${getCleanMobile()}`;
 
     setLoading(true);
 
     const { error } = await supabase.auth.verifyOtp({
-      phone: `+91${cleanedMobile}`,
+      phone: formattedPhone,
       token: otp,
       type: "sms",
     });
@@ -226,12 +238,8 @@ export default function LoginScreen() {
 
   const handleUnlock = async () => {
     const verified = await verifyDeviceSecurity();
-
-    if (verified) {
-      router.replace("./my-role");
-    } else {
-      Alert.alert("Verification Failed", "Unable to unlock.");
-    }
+    if (verified) router.replace("./my-role");
+    else Alert.alert("Verification Failed");
   };
 
   if (checkingSession) {
@@ -278,7 +286,6 @@ export default function LoginScreen() {
               <Mail size={20} />
               <TextInput
                 placeholder="Email Address"
-                placeholderTextColor="#9ca3af"
                 style={styles.input}
                 autoCapitalize="none"
                 value={email}
@@ -290,7 +297,6 @@ export default function LoginScreen() {
               <Lock size={20} />
               <TextInput
                 placeholder="Password"
-                placeholderTextColor="#9ca3af"
                 style={styles.input}
                 secureTextEntry={!showPassword}
                 value={password}
@@ -329,12 +335,14 @@ export default function LoginScreen() {
         {loginMode === "mobile" && !otpSent && (
           <>
             <View style={styles.inputContainer}>
+              <Text style={styles.countryCode}>+91</Text>
               <TextInput
-                placeholder="Mobile Number"
+                placeholder="Enter 10 digit number"
                 keyboardType="phone-pad"
                 style={styles.input}
+                maxLength={10}
                 value={mobile}
-                onChangeText={setMobile}
+                onChangeText={(text) => setMobile(text.replace(/\D/g, ""))}
               />
             </View>
 
@@ -374,6 +382,24 @@ export default function LoginScreen() {
               ) : (
                 <Text style={styles.primaryBtnText}>Verify OTP</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (!isResendDisabled) handleSendOtp();
+              }}
+              disabled={isResendDisabled}
+              style={{ marginTop: 15 }}
+            >
+              <Text
+                style={{
+                  textAlign: "center",
+                  fontWeight: "600",
+                  color: isResendDisabled ? "#999" : "#000",
+                }}
+              >
+                {isResendDisabled ? `Resend OTP in ${timer}s` : "Resend OTP"}
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -436,7 +462,7 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: 15,
     marginBottom: 15,
-    gap: 10,
+    gap: 8,
   },
   input: {
     flex: 1,
@@ -469,6 +495,11 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 16,
     fontWeight: "700",
+    color: "#000",
+  },
+  countryCode: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "#000",
   },
 });

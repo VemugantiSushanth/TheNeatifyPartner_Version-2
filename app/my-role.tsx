@@ -69,8 +69,10 @@ export default function MyRoleScreen() {
   /* ================= FETCH COUNTS ================= */
   const fetchCounts = async () => {
     const { data } = await supabase.auth.getUser();
-    const email = data.user?.email;
-    if (!email) return;
+    const user = data.user;
+    if (!user) return;
+
+    const email = user.email;
 
     const { count: notif } = await supabase
       .from("bookings")
@@ -90,9 +92,17 @@ export default function MyRoleScreen() {
       .eq("assigned_staff_email", email)
       .eq("work_status", "COMPLETED");
 
+    const assignedValue = assigned || 0;
+
     setNewCount(notif || 0);
-    setAssignedCount(assigned || 0);
+    setAssignedCount(assignedValue);
     setCompletedCount(completed || 0);
+
+    // 🔥 NEW PART: Sync with staff_profile table
+    await supabase
+      .from("staff_profile")
+      .update({ assigned_count: assignedValue })
+      .eq("id", user.id);
   };
 
   /* ================= FETCH AVAILABILITY ================= */
