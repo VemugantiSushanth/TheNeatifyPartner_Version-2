@@ -445,6 +445,7 @@ export default function AssignedServiceDetails() {
         >
           <View style={styles.card}>
             <Text style={styles.title}>{booking.customer_name}</Text>
+            <Text>Date: {booking.booking_date}</Text>
             <Text>Time: {booking.booking_time}</Text>
             <Text>Address: {booking.full_address}</Text>
 

@@ -111,6 +111,10 @@ export default function AssignedServices() {
                 </Text>
 
                 <Text>
+                  <Text style={styles.label}>Date:</Text> {item.booking_date}
+                </Text>
+
+                <Text>
                   <Text style={styles.label}>Time:</Text> {item.booking_time}
                 </Text>
 
